@@ -42,11 +42,13 @@ export class BlackjackEngine {
     return this.shoe.length < 78;
   }
 
-  dealCard() {
+  dealCard(faceDown = false) {
     if (this.shouldReshuffle()) {
       this.shuffleShoe();
     }
-    return this.shoe.pop();
+    const card = this.shoe.pop();
+    card.faceDown = faceDown;
+    return card;
   }
 
   async startHand(betAmount) {
@@ -115,15 +117,28 @@ export class BlackjackEngine {
     return this.getGameState();
   }
 
-  doubleDown() {
+  doubleDown(faceDown = true) {
     if (this.gameState !== 'player-turn') return this.getGameState();
     if (this.playerHands[this.currentHandIndex].length !== 2) return this.getGameState();
 
     this.bet *= 2;
-    this.hit();
 
-    // Automatically stand after doubling
-    if (this.gameState === 'player-turn') {
+    // Deal one card (optionally face down)
+    const currentHand = this.playerHands[this.currentHandIndex];
+    const card = this.dealCard(faceDown);
+    currentHand.push(card);
+
+    const handValue = this.getHandValue(currentHand);
+
+    // Check for bust
+    if (handValue > 21) {
+      if (this.currentHandIndex < this.playerHands.length - 1) {
+        this.currentHandIndex++;
+      } else {
+        this.checkAllHandsBust();
+      }
+    } else {
+      // Automatically stand after doubling
       this.stand();
     }
 
