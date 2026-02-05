@@ -402,26 +402,86 @@ export const CrapsTable = () => {
           tooltip={gameState?.phase !== 'comeOut' ? 'Only available on Come Out Roll' : 'Pass Line - wins on 7, 11; loses on 2, 3, 12'}
         />
 
-        {/* Proposition Bets (Hardways, etc.) */}
-        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 p-4 rounded-lg border-2 border-casino-gold max-w-xs">
-          <div className="text-casino-gold text-xs font-bold mb-2 text-center">ONE ROLL BETS</div>
-          <div className="grid grid-cols-2 gap-2">
-            <BetArea
-              label={<div className="text-xs">ANY<br/>SEVEN<br/>4:1</div>}
-              betType="anySeven"
-              amount={gameState?.bets?.anySeven || 0}
-              onClick={() => handlePlaceBet('anySeven')}
-              onRemove={() => handleRemoveBet('anySeven')}
-              className="h-16 text-red-500 text-xs bg-black"
-            />
-            <BetArea
-              label={<div className="text-xs">ANY<br/>CRAPS<br/>7:1</div>}
-              betType="anyCraps"
-              amount={gameState?.bets?.anyCraps || 0}
-              onClick={() => handlePlaceBet('anyCraps')}
-              onRemove={() => handleRemoveBet('anyCraps')}
-              className="h-16 text-xs bg-black"
-            />
+        {/* Proposition Bets Section */}
+        <div className="mt-4 bg-black bg-opacity-30 p-4 rounded-lg border-2 border-casino-gold">
+          <div className="grid grid-cols-2 gap-4">
+            {/* Hardways */}
+            <div className="bg-black bg-opacity-50 p-3 rounded-lg">
+              <div className="text-casino-gold text-xs font-bold mb-2 text-center">HARDWAYS</div>
+              <div className="grid grid-cols-2 gap-2">
+                <BetArea
+                  label={<div className="text-xs">HARD<br/>4<br/>7:1</div>}
+                  betType="hardway"
+                  amount={gameState?.bets?.hardways?.[4] || 0}
+                  onClick={() => handlePlaceBet('hardway', 4)}
+                  onRemove={() => handleRemoveBet('hardway', 4)}
+                  className="h-16 text-xs bg-casino-green-dark"
+                />
+                <BetArea
+                  label={<div className="text-xs">HARD<br/>6<br/>9:1</div>}
+                  betType="hardway"
+                  amount={gameState?.bets?.hardways?.[6] || 0}
+                  onClick={() => handlePlaceBet('hardway', 6)}
+                  onRemove={() => handleRemoveBet('hardway', 6)}
+                  className="h-16 text-xs bg-casino-green-dark"
+                />
+                <BetArea
+                  label={<div className="text-xs">HARD<br/>8<br/>9:1</div>}
+                  betType="hardway"
+                  amount={gameState?.bets?.hardways?.[8] || 0}
+                  onClick={() => handlePlaceBet('hardway', 8)}
+                  onRemove={() => handleRemoveBet('hardway', 8)}
+                  className="h-16 text-xs bg-casino-green-dark"
+                />
+                <BetArea
+                  label={<div className="text-xs">HARD<br/>10<br/>7:1</div>}
+                  betType="hardway"
+                  amount={gameState?.bets?.hardways?.[10] || 0}
+                  onClick={() => handlePlaceBet('hardway', 10)}
+                  onRemove={() => handleRemoveBet('hardway', 10)}
+                  className="h-16 text-xs bg-casino-green-dark"
+                />
+              </div>
+            </div>
+
+            {/* One Roll Bets */}
+            <div className="bg-black bg-opacity-50 p-3 rounded-lg">
+              <div className="text-casino-gold text-xs font-bold mb-2 text-center">ONE ROLL BETS</div>
+              <div className="grid grid-cols-2 gap-2">
+                <BetArea
+                  label={<div className="text-xs">ANY<br/>SEVEN<br/>4:1</div>}
+                  betType="anySeven"
+                  amount={gameState?.bets?.anySeven || 0}
+                  onClick={() => handlePlaceBet('anySeven')}
+                  onRemove={() => handleRemoveBet('anySeven')}
+                  className="h-16 text-red-500 text-xs bg-casino-green-dark"
+                />
+                <BetArea
+                  label={<div className="text-xs">ANY<br/>CRAPS<br/>7:1</div>}
+                  betType="anyCraps"
+                  amount={gameState?.bets?.anyCraps || 0}
+                  onClick={() => handlePlaceBet('anyCraps')}
+                  onRemove={() => handleRemoveBet('anyCraps')}
+                  className="h-16 text-xs bg-casino-green-dark"
+                />
+                <BetArea
+                  label={<div className="text-xs">HORN<br/>2<br/>30:1</div>}
+                  betType="horn"
+                  amount={gameState?.bets?.horn?.[2] || 0}
+                  onClick={() => handlePlaceBet('horn', 2)}
+                  onRemove={() => handleRemoveBet('horn', 2)}
+                  className="h-16 text-xs bg-casino-green-dark"
+                />
+                <BetArea
+                  label={<div className="text-xs">HORN<br/>12<br/>30:1</div>}
+                  betType="horn"
+                  amount={gameState?.bets?.horn?.[12] || 0}
+                  onClick={() => handlePlaceBet('horn', 12)}
+                  onRemove={() => handleRemoveBet('horn', 12)}
+                  className="h-16 text-xs bg-casino-green-dark"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
