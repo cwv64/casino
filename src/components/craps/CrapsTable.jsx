@@ -87,7 +87,7 @@ export const CrapsTable = () => {
     return (
       <div className="flex flex-col gap-1">
         {/* LAY area - shows Don't Come bets */}
-        <div className="relative h-8 text-xs bg-black bg-opacity-30 border-2 border-white border-opacity-40 rounded-md flex items-center justify-center text-white font-bold">
+        <div className="relative h-6 sm:h-8 text-[0.65rem] sm:text-xs bg-black bg-opacity-30 border-2 border-white border-opacity-40 rounded-md flex items-center justify-center text-white font-bold">
           LAY
           {dontComeBet?.amount > 0 && (
             <motion.div
@@ -95,26 +95,29 @@ export const CrapsTable = () => {
               animate={{ scale: 1, x: 0 }}
               className="absolute -top-2 -right-2"
             >
-              <Chip value={dontComeBet.amount} className="w-10 h-10 text-xs" />
+              <Chip value={dontComeBet.amount} className="w-8 h-8 sm:w-10 sm:h-10 text-xs" />
             </motion.div>
           )}
         </div>
 
         {/* Main number box */}
-        <div className={`relative border-4 ${isPoint ? 'border-casino-gold shadow-glow-gold-lg animate-pulse-glow' : 'border-casino-gold/60'} bg-gradient-to-br from-casino-green-dark to-black/60 backdrop-blur-sm p-4 rounded-xl min-h-[120px] flex flex-col items-center justify-center`}>
+        <div className={`relative border-2 sm:border-4 ${isPoint ? 'border-casino-gold shadow-glow-gold-lg animate-pulse-glow' : 'border-casino-gold/60'} bg-gradient-to-br from-casino-green-dark to-black/60 backdrop-blur-sm p-2 sm:p-4 rounded-lg sm:rounded-xl min-h-[80px] sm:min-h-[120px] flex flex-col items-center justify-center overflow-hidden`}>
           {/* Dealer Puck */}
           {showPuck && (
             <motion.div
               initial={{ y: -50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              className="absolute -top-8 z-10"
+              className="absolute -top-6 sm:-top-8 z-10"
             >
               <DealerPuck isOn={true} position={number} />
             </motion.div>
           )}
 
-          {/* Number display */}
-          <div className={`text-5xl font-bold ${isPoint ? 'text-casino-gold' : 'text-white'}`}>
+          {/* Number display - Responsive sizing with clamp */}
+          <div
+            className={`font-bold ${isPoint ? 'text-casino-gold' : 'text-white'}`}
+            style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)' }}
+          >
             {displayText || number}
           </div>
 
@@ -123,9 +126,9 @@ export const CrapsTable = () => {
             <motion.div
               initial={{ scale: 0, y: -20 }}
               animate={{ scale: 1, y: 0 }}
-              className="absolute top-2 right-2"
+              className="absolute top-1 right-1 sm:top-2 sm:right-2"
             >
-              <Chip value={comeBet.amount} className="w-10 h-10 text-xs" />
+              <Chip value={comeBet.amount} className="w-8 h-8 sm:w-10 sm:h-10 text-xs" />
             </motion.div>
           )}
 
@@ -134,9 +137,9 @@ export const CrapsTable = () => {
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="absolute bottom-2 left-2"
+              className="absolute bottom-1 left-1 sm:bottom-2 sm:left-2"
             >
-              <Chip value={placeBet} className="w-10 h-10 text-xs" />
+              <Chip value={placeBet} className="w-8 h-8 sm:w-10 sm:h-10 text-xs" />
             </motion.div>
           )}
         </div>
@@ -150,7 +153,7 @@ export const CrapsTable = () => {
             onClick={() => handlePlaceBet('place', number)}
             onRemove={() => handleRemoveBet('place', number)}
             disabled={false}
-            className="h-10 text-xs bg-casino-green"
+            className="h-8 sm:h-10 text-[0.65rem] sm:text-xs bg-casino-green"
             showAmount={false}
           />
           <BetArea
@@ -158,7 +161,7 @@ export const CrapsTable = () => {
             betType={`buy${number}`}
             amount={0}
             disabled={true}
-            className="h-10 text-xs bg-casino-green opacity-50"
+            className="h-8 sm:h-10 text-[0.65rem] sm:text-xs bg-casino-green opacity-50"
           />
         </div>
       </div>
@@ -285,16 +288,16 @@ export const CrapsTable = () => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-6 p-6 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[900px] rounded-2xl shadow-felt-depth">
+    <div className="flex flex-col items-center gap-4 sm:gap-6 p-3 sm:p-6 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[900px] rounded-2xl shadow-felt-depth max-w-full box-border overflow-x-hidden">
       {/* Win Celebration */}
       <WinCelebration show={showWinCelebration} />
 
       {/* Phase and Point Display */}
-      <div className="flex gap-8 items-center">
-        <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-casino-gold shadow-glow-gold">
-          <div className="text-casino-gold text-sm font-semibold">Phase</div>
-          <div className="text-white text-xl font-bold capitalize">
-            {gameState?.phase === 'comeOut' ? 'Come Out Roll' : 'Point'}
+      <div className="flex gap-2 sm:gap-8 items-center flex-wrap justify-center">
+        <div className="bg-black/40 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl border-2 border-casino-gold shadow-glow-gold">
+          <div className="text-casino-gold text-xs sm:text-sm font-semibold">Phase</div>
+          <div className="text-white text-base sm:text-xl font-bold capitalize">
+            {gameState?.phase === 'comeOut' ? 'Come Out' : 'Point'}
           </div>
         </div>
 
@@ -302,16 +305,16 @@ export const CrapsTable = () => {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="bg-gradient-to-br from-yellow-400 via-casino-gold to-yellow-600 px-8 py-4 rounded-xl shadow-glow-gold-lg border-4 border-yellow-300"
+            className="bg-gradient-to-br from-yellow-400 via-casino-gold to-yellow-600 px-4 sm:px-8 py-3 sm:py-4 rounded-lg sm:rounded-xl shadow-glow-gold-lg border-2 sm:border-4 border-yellow-300"
           >
-            <div className="text-charcoal text-sm font-bold">Point</div>
-            <div className="text-charcoal text-4xl font-black drop-shadow-lg">{gameState.point}</div>
+            <div className="text-charcoal text-xs sm:text-sm font-bold">Point</div>
+            <div className="text-charcoal text-2xl sm:text-4xl font-black drop-shadow-lg">{gameState.point}</div>
           </motion.div>
         )}
 
-        <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-casino-gold shadow-glow-gold">
-          <div className="text-casino-gold text-sm font-semibold">Total Bets</div>
-          <div className="text-white text-xl font-bold">${totalBets}</div>
+        <div className="bg-black/40 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl border-2 border-casino-gold shadow-glow-gold">
+          <div className="text-casino-gold text-xs sm:text-sm font-semibold">Total Bets</div>
+          <div className="text-white text-base sm:text-xl font-bold">${totalBets}</div>
         </div>
       </div>
 
@@ -347,7 +350,7 @@ export const CrapsTable = () => {
       </div>
 
       {/* Dice Display */}
-      <div className="bg-black/50 backdrop-blur-lg p-8 rounded-2xl border-4 border-casino-gold shadow-glow-gold-lg min-h-[150px] flex items-center justify-center w-full max-w-md">
+      <div className="bg-black/50 backdrop-blur-lg p-4 sm:p-8 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-casino-gold shadow-glow-gold-lg min-h-[100px] sm:min-h-[150px] flex items-center justify-center w-full max-w-md">
         {rollResult ? (
           <DicePair
             die1={rollResult.roll.die1}
@@ -392,10 +395,10 @@ export const CrapsTable = () => {
       </AnimatePresence>
 
       {/* Main Craps Table Layout */}
-      <div className="w-full max-w-7xl bg-gradient-to-br from-casino-green-dark via-casino-green to-casino-green-light bg-felt-texture border-8 border-casino-gold shadow-glow-gold-lg rounded-3xl p-8 relative">
+      <div className="w-full max-w-7xl bg-gradient-to-br from-casino-green-dark via-casino-green to-casino-green-light bg-felt-texture border-4 sm:border-8 border-casino-gold shadow-glow-gold-lg rounded-2xl sm:rounded-3xl p-3 sm:p-8 relative box-border overflow-hidden">
 
         {/* Top: Number Boxes (4, 5, SIX, 8, NINE, 10) + Don't Come Bar */}
-        <div className="grid grid-cols-7 gap-3 mb-6">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-3 mb-4 sm:mb-6">
           <NumberBox number={4} />
           <NumberBox number={5} />
           <NumberBox number={6} displayText="SIX" />
@@ -405,14 +408,14 @@ export const CrapsTable = () => {
 
           {/* Don't Come Bar */}
           <div className="flex flex-col gap-1">
-            <div className="h-8"></div>
+            <div className="h-6 sm:h-8"></div>
             <BetArea
               label={
                 <div className="flex flex-col items-center">
-                  <div className="text-xs">DON'T</div>
-                  <div className="text-lg">COME</div>
-                  <div className="text-xs">BAR</div>
-                  <div className="text-2xl">⚅⚅</div>
+                  <div className="text-[0.6rem] sm:text-xs">DON'T</div>
+                  <div className="text-sm sm:text-lg font-bold">COME</div>
+                  <div className="text-[0.6rem] sm:text-xs">BAR</div>
+                  <div className="text-lg sm:text-2xl">⚅⚅</div>
                 </div>
               }
               betType="dontCome"
@@ -420,35 +423,35 @@ export const CrapsTable = () => {
               onClick={() => handlePlaceBet('dontCome')}
               onRemove={() => handleRemoveBet('dontCome')}
               disabled={gameState?.phase === 'comeOut'}
-              className="min-h-[120px] bg-black bg-opacity-20 text-white"
+              className="min-h-[80px] sm:min-h-[120px] bg-black bg-opacity-20 text-white"
             />
-            <div className="h-[52px]"></div>
+            <div className="h-8 sm:h-[52px]"></div>
           </div>
         </div>
 
         {/* Middle: Come Area + Field */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-3 sm:mb-4">
           {/* COME Box */}
           <BetArea
-            label={<div className="text-4xl text-red-500 font-black">COME</div>}
+            label={<div className="text-2xl sm:text-4xl text-red-500 font-black">COME</div>}
             betType="come"
             amount={gameState?.bets?.come || 0}
             onClick={() => handlePlaceBet('come')}
             onRemove={() => handleRemoveBet('come')}
             disabled={gameState?.phase === 'comeOut'}
-            className="h-32 text-6xl bg-casino-green-dark"
+            className="h-24 sm:h-32 bg-casino-green-dark"
           />
 
           {/* FIELD Box */}
           <BetArea
             label={
-              <div className="flex flex-col items-center gap-1">
-                <div className="text-sm text-gray-300">PAYS DOUBLE</div>
-                <div className="flex gap-2 text-xl">
-                  <span>2 • 3 • 4 • 9 • 10 • 11 • 12</span>
+              <div className="flex flex-col items-center gap-0.5 sm:gap-1">
+                <div className="text-[0.65rem] sm:text-sm text-gray-300">PAYS DOUBLE</div>
+                <div className="text-xs sm:text-xl">
+                  <span>2•3•4•9•10•11•12</span>
                 </div>
-                <div className="text-3xl font-black">FIELD</div>
-                <div className="text-sm text-gray-300">PAYS DOUBLE</div>
+                <div className="text-xl sm:text-3xl font-black">FIELD</div>
+                <div className="text-[0.65rem] sm:text-sm text-gray-300 hidden sm:block">PAYS DOUBLE</div>
               </div>
             }
             betType="field"
@@ -456,16 +459,16 @@ export const CrapsTable = () => {
             onClick={() => handlePlaceBet('field')}
             onRemove={() => handleRemoveBet('field')}
             disabled={false}
-            className="h-32 bg-casino-green text-white"
+            className="h-24 sm:h-32 bg-casino-green text-white"
           />
         </div>
 
         {/* Don't Pass Bar */}
         <BetArea
           label={
-            <div className="flex items-center justify-between px-8">
-              <span className="text-3xl font-black">DON'T PASS BAR</span>
-              <span className="text-4xl">⚅⚅</span>
+            <div className="flex items-center justify-between px-2 sm:px-8">
+              <span className="text-lg sm:text-3xl font-black">DON'T PASS BAR</span>
+              <span className="text-2xl sm:text-4xl">⚅⚅</span>
             </div>
           }
           betType="dontPass"
@@ -473,99 +476,99 @@ export const CrapsTable = () => {
           onClick={() => handlePlaceBet('dontPass')}
           onRemove={() => handleRemoveBet('dontPass')}
           disabled={gameState?.phase !== 'comeOut'}
-          className="h-20 mb-3 bg-black bg-opacity-30 text-white"
+          className="h-14 sm:h-20 mb-2 sm:mb-3 bg-black bg-opacity-30 text-white"
           tooltip={gameState?.phase !== 'comeOut' ? 'Only available on Come Out Roll' : 'Don\'t Pass Bar - wins on 2, 3; push on 12; loses on 7, 11'}
         />
 
         {/* Pass Line */}
         <BetArea
-          label={<span className="text-4xl font-black text-blue-300">PASS LINE</span>}
+          label={<span className="text-2xl sm:text-4xl font-black text-blue-300">PASS LINE</span>}
           betType="passLine"
           amount={gameState?.bets?.passLine || 0}
           onClick={() => handlePlaceBet('passLine')}
           onRemove={() => handleRemoveBet('passLine')}
           disabled={gameState?.phase !== 'comeOut'}
-          className="h-24 bg-casino-green-dark border-4"
+          className="h-16 sm:h-24 bg-casino-green-dark border-2 sm:border-4"
           tooltip={gameState?.phase !== 'comeOut' ? 'Only available on Come Out Roll' : 'Pass Line - wins on 7, 11; loses on 2, 3, 12'}
         />
 
         {/* Proposition Bets Section */}
-        <div className="mt-4 bg-black bg-opacity-30 p-4 rounded-lg border-2 border-casino-gold">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="mt-3 sm:mt-4 bg-black bg-opacity-30 p-2 sm:p-4 rounded-lg border-2 border-casino-gold">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
             {/* Hardways */}
-            <div className="bg-black bg-opacity-50 p-3 rounded-lg">
-              <div className="text-casino-gold text-xs font-bold mb-2 text-center">HARDWAYS</div>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="bg-black bg-opacity-50 p-2 sm:p-3 rounded-lg">
+              <div className="text-casino-gold text-[0.65rem] sm:text-xs font-bold mb-1 sm:mb-2 text-center">HARDWAYS</div>
+              <div className="grid grid-cols-2 gap-1 sm:gap-2">
                 <BetArea
-                  label={<div className="text-xs">HARD<br/>4<br/>7:1</div>}
+                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HARD<br/>4<br/>7:1</div>}
                   betType="hardway"
                   amount={gameState?.bets?.hardways?.[4] || 0}
                   onClick={() => handlePlaceBet('hardway', 4)}
                   onRemove={() => handleRemoveBet('hardway', 4)}
-                  className="h-16 text-xs bg-casino-green-dark"
+                  className="h-12 sm:h-16 bg-casino-green-dark"
                 />
                 <BetArea
-                  label={<div className="text-xs">HARD<br/>6<br/>9:1</div>}
+                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HARD<br/>6<br/>9:1</div>}
                   betType="hardway"
                   amount={gameState?.bets?.hardways?.[6] || 0}
                   onClick={() => handlePlaceBet('hardway', 6)}
                   onRemove={() => handleRemoveBet('hardway', 6)}
-                  className="h-16 text-xs bg-casino-green-dark"
+                  className="h-12 sm:h-16 bg-casino-green-dark"
                 />
                 <BetArea
-                  label={<div className="text-xs">HARD<br/>8<br/>9:1</div>}
+                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HARD<br/>8<br/>9:1</div>}
                   betType="hardway"
                   amount={gameState?.bets?.hardways?.[8] || 0}
                   onClick={() => handlePlaceBet('hardway', 8)}
                   onRemove={() => handleRemoveBet('hardway', 8)}
-                  className="h-16 text-xs bg-casino-green-dark"
+                  className="h-12 sm:h-16 bg-casino-green-dark"
                 />
                 <BetArea
-                  label={<div className="text-xs">HARD<br/>10<br/>7:1</div>}
+                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HARD<br/>10<br/>7:1</div>}
                   betType="hardway"
                   amount={gameState?.bets?.hardways?.[10] || 0}
                   onClick={() => handlePlaceBet('hardway', 10)}
                   onRemove={() => handleRemoveBet('hardway', 10)}
-                  className="h-16 text-xs bg-casino-green-dark"
+                  className="h-12 sm:h-16 bg-casino-green-dark"
                 />
               </div>
             </div>
 
             {/* One Roll Bets */}
-            <div className="bg-black bg-opacity-50 p-3 rounded-lg">
-              <div className="text-casino-gold text-xs font-bold mb-2 text-center">ONE ROLL BETS</div>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="bg-black bg-opacity-50 p-2 sm:p-3 rounded-lg">
+              <div className="text-casino-gold text-[0.65rem] sm:text-xs font-bold mb-1 sm:mb-2 text-center">ONE ROLL BETS</div>
+              <div className="grid grid-cols-2 gap-1 sm:gap-2">
                 <BetArea
-                  label={<div className="text-xs">ANY<br/>SEVEN<br/>4:1</div>}
+                  label={<div className="text-[0.6rem] sm:text-xs text-red-500 leading-tight">ANY<br/>SEVEN<br/>4:1</div>}
                   betType="anySeven"
                   amount={gameState?.bets?.anySeven || 0}
                   onClick={() => handlePlaceBet('anySeven')}
                   onRemove={() => handleRemoveBet('anySeven')}
-                  className="h-16 text-red-500 text-xs bg-casino-green-dark"
+                  className="h-12 sm:h-16 bg-casino-green-dark"
                 />
                 <BetArea
-                  label={<div className="text-xs">ANY<br/>CRAPS<br/>7:1</div>}
+                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">ANY<br/>CRAPS<br/>7:1</div>}
                   betType="anyCraps"
                   amount={gameState?.bets?.anyCraps || 0}
                   onClick={() => handlePlaceBet('anyCraps')}
                   onRemove={() => handleRemoveBet('anyCraps')}
-                  className="h-16 text-xs bg-casino-green-dark"
+                  className="h-12 sm:h-16 bg-casino-green-dark"
                 />
                 <BetArea
-                  label={<div className="text-xs">HORN<br/>2<br/>30:1</div>}
+                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HORN<br/>2<br/>30:1</div>}
                   betType="horn"
                   amount={gameState?.bets?.horn?.[2] || 0}
                   onClick={() => handlePlaceBet('horn', 2)}
                   onRemove={() => handleRemoveBet('horn', 2)}
-                  className="h-16 text-xs bg-casino-green-dark"
+                  className="h-12 sm:h-16 bg-casino-green-dark"
                 />
                 <BetArea
-                  label={<div className="text-xs">HORN<br/>12<br/>30:1</div>}
+                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HORN<br/>12<br/>30:1</div>}
                   betType="horn"
                   amount={gameState?.bets?.horn?.[12] || 0}
                   onClick={() => handlePlaceBet('horn', 12)}
                   onRemove={() => handleRemoveBet('horn', 12)}
-                  className="h-16 text-xs bg-casino-green-dark"
+                  className="h-12 sm:h-16 bg-casino-green-dark"
                 />
               </div>
             </div>
