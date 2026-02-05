@@ -323,6 +323,7 @@ export class CrapsEngine {
 
   evaluateComeBets(total) {
     const outcomes = [];
+    let justMoved = null; // Track if a Come bet just moved this roll
 
     // Active Come bet in Come area
     if (this.bets.come > 0) {
@@ -347,6 +348,7 @@ export class CrapsEngine {
       } else if ([4, 5, 6, 8, 9, 10].includes(total)) {
         // Move Come bet to the number
         this.bets.comeNumbers[total].amount += this.bets.come;
+        justMoved = total; // Mark this number as just moved
         outcomes.push({
           bet: 'come',
           result: 'moved',
@@ -358,11 +360,14 @@ export class CrapsEngine {
       }
     }
 
-    // Check Come bets on numbers
+    // Check Come bets on numbers (but NOT the one that just moved)
     Object.keys(this.bets.comeNumbers).forEach(num => {
       const comeBet = this.bets.comeNumbers[num];
-      if (comeBet.amount > 0 && parseInt(num) === total) {
-        const oddsPayout = comeBet.odds > 0 ? this.calculateOddsPayout(parseInt(num), comeBet.odds) : 0;
+      const numInt = parseInt(num);
+
+      // Only evaluate if there's a bet AND it didn't just move this roll
+      if (comeBet.amount > 0 && numInt === total && numInt !== justMoved) {
+        const oddsPayout = comeBet.odds > 0 ? this.calculateOddsPayout(numInt, comeBet.odds) : 0;
         const totalPayout = comeBet.amount * 2 + comeBet.odds + oddsPayout;
 
         outcomes.push({
@@ -370,7 +375,7 @@ export class CrapsEngine {
           result: 'win',
           amount: comeBet.amount + comeBet.odds,
           payout: totalPayout,
-          number: parseInt(num),
+          number: numInt,
           message: `Come bet on ${num} wins!`
         });
 
@@ -378,6 +383,46 @@ export class CrapsEngine {
         comeBet.odds = 0;
       }
     });
+
+    // Don't Come bet evaluation
+    if (this.bets.dontCome > 0) {
+      if (total === 2 || total === 3) {
+        outcomes.push({
+          bet: 'dontCome',
+          result: 'win',
+          amount: this.bets.dontCome,
+          payout: this.bets.dontCome * 2,
+          message: 'Don\'t Come wins!'
+        });
+        this.bets.dontCome = 0;
+      } else if (total === 7 || total === 11) {
+        outcomes.push({
+          bet: 'dontCome',
+          result: 'lose',
+          amount: this.bets.dontCome,
+          payout: 0,
+          message: 'Don\'t Come loses'
+        });
+        this.bets.dontCome = 0;
+      } else if (total === 12) {
+        outcomes.push({
+          bet: 'dontCome',
+          result: 'push',
+          amount: this.bets.dontCome,
+          payout: this.bets.dontCome,
+          message: 'Don\'t Come pushes on 12'
+        });
+        this.bets.dontCome = 0;
+      } else if ([4, 5, 6, 8, 9, 10].includes(total)) {
+        // Don't Come bets don't move in this implementation
+        // Just note it established
+        outcomes.push({
+          bet: 'dontCome',
+          result: 'established',
+          message: `Don't Come established on ${total}`
+        });
+      }
+    }
 
     return outcomes;
   }

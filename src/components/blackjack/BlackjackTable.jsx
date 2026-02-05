@@ -44,8 +44,9 @@ export const BlackjackTable = () => {
     doubleDown(doubleDownFaceDown);
   };
 
-  const getHandValue = (hand) => {
-    if (!hand) return 0;
+  const getHandValue = (hand, showSoft = false) => {
+    if (!hand) return showSoft ? { soft: 0, hard: 0, display: '0' } : 0;
+
     let value = 0;
     let aces = 0;
 
@@ -60,12 +61,35 @@ export const BlackjackTable = () => {
       }
     }
 
-    while (value > 21 && aces > 0) {
-      value -= 10;
+    const hardValue = value - (aces * 10); // All aces count as 1
+    let softValue = value;
+
+    // Adjust aces to prevent bust
+    while (softValue > 21 && aces > 0) {
+      softValue -= 10;
       aces--;
     }
 
-    return value;
+    if (showSoft) {
+      // Check if hand has usable ace (soft hand)
+      const hasUsableAce = hand.some(c => c.rank === 'A') && softValue !== hardValue && softValue <= 21;
+
+      if (hasUsableAce) {
+        return {
+          soft: softValue,
+          hard: hardValue,
+          display: `${hardValue}/${softValue}`
+        };
+      } else {
+        return {
+          soft: softValue,
+          hard: softValue,
+          display: `${softValue}`
+        };
+      }
+    }
+
+    return softValue;
   };
 
   if (!isInitialized) {
@@ -125,22 +149,32 @@ export const BlackjackTable = () => {
 
       {/* Player's Hands */}
       <div className="flex gap-8">
-        {gameState?.playerHands?.map((hand, index) => (
-          <div key={index} className="flex flex-col items-center gap-4">
-            <Hand
-              cards={hand}
-              label={`Player${gameState.playerHands.length > 1 ? ` ${index + 1}` : ''}`}
-              dealDelay={0}
-            />
-            <div className="text-white text-lg font-semibold">
-              Value: {getHandValue(hand)}
-              {getHandValue(hand) > 21 && ' - BUST!'}
+        {gameState?.playerHands?.map((hand, index) => {
+          const handVal = getHandValue(hand, true);
+          const cardDelay = hand.length * 0.3; // Delay based on number of cards
+
+          return (
+            <div key={index} className="flex flex-col items-center gap-4">
+              <Hand
+                cards={hand}
+                label={`Player${gameState.playerHands.length > 1 ? ` ${index + 1}` : ''}`}
+                dealDelay={0}
+              />
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: cardDelay + 0.3 }}
+                className="text-white text-lg font-semibold"
+              >
+                Value: {handVal.display}
+                {handVal.soft > 21 && ' - BUST!'}
+              </motion.div>
+              {gameState.currentHandIndex === index && gameState.gameState === 'player-turn' && (
+                <div className="text-casino-gold animate-pulse">← Active</div>
+              )}
             </div>
-            {gameState.currentHandIndex === index && gameState.gameState === 'player-turn' && (
-              <div className="text-casino-gold animate-pulse">← Active</div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Betting Area */}
