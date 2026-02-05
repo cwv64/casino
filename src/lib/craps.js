@@ -415,6 +415,7 @@ export class CrapsEngine {
         });
         this.bets.dontCome = 0;
       } else if (total === 12) {
+        // Fix 1.8: push refunds the bet — use 'push' result which the component handles
         outcomes.push({
           bet: 'dontCome',
           result: 'push',
@@ -521,19 +522,19 @@ export class CrapsEngine {
   evaluatePlaceBets(total) {
     const outcomes = [];
 
-    // Place bet wins
+    // Fix 1.6: Place bet wins - payout is winnings only (bet stays on the table)
     if (this.bets.place[total] > 0) {
       const betAmount = this.bets.place[total];
-      const payout = this.calculatePlacePayout(total, betAmount);
+      const winnings = this.calculatePlacePayout(total, betAmount);
       outcomes.push({
         bet: `place${total}`,
         result: 'win',
         amount: betAmount,
-        payout: betAmount + payout,
+        payout: winnings,
         number: total,
         message: `Place ${total} wins!`
       });
-      // Place bets stay up unless taken down
+      // Place bets stay up unless taken down - bet is NOT removed
     }
 
     // Seven clears all place bets

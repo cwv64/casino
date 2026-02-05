@@ -39,9 +39,10 @@ export const setWalletBalance = (balance) => {
   }
 };
 
+// Fix 1.5: prevent balance from going negative
 export const updateWalletBalance = (amount) => {
   const currentBalance = getWalletBalance();
-  const newBalance = currentBalance + amount;
+  const newBalance = Math.max(0, currentBalance + amount);
   setWalletBalance(newBalance);
   return newBalance;
 };

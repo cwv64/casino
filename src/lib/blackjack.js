@@ -19,10 +19,12 @@ export class BlackjackEngine {
     this.nonce = 0;
     this.dealerHand = [];
     this.playerHands = [[]]; // Support for splits
+    this.handBets = [0]; // Per-hand bet tracking (fix 1.2)
     this.currentHandIndex = 0;
     this.gameState = 'betting'; // betting, dealing, player-turn, dealer-turn, finished
-    this.bet = 0;
+    this.bet = 0; // Total amount wagered (sum of all hand bets)
     this.result = null;
+    this.shufflePromise = null; // Track pending shuffle (fix 1.7)
   }
 
   async initialize() {
@@ -33,7 +35,9 @@ export class BlackjackEngine {
   }
 
   async shuffleShoe() {
-    this.shoe = await generateShuffledDeck(this.serverSeed, this.clientSeed, this.nonce);
+    this.shufflePromise = generateShuffledDeck(this.serverSeed, this.clientSeed, this.nonce);
+    this.shoe = await this.shufflePromise;
+    this.shufflePromise = null;
     this.nonce += this.shoe.length; // Increment nonce for next shuffle
   }
 
@@ -42,9 +46,13 @@ export class BlackjackEngine {
     return this.shoe.length < 78;
   }
 
-  dealCard(faceDown = false) {
+  // Fix 1.7: dealCard is now async to properly await reshuffles
+  async dealCard(faceDown = false) {
+    if (this.shufflePromise) {
+      await this.shufflePromise;
+    }
     if (this.shouldReshuffle()) {
-      this.shuffleShoe();
+      await this.shuffleShoe();
     }
     const card = this.shoe.pop();
     card.faceDown = faceDown;
@@ -59,21 +67,23 @@ export class BlackjackEngine {
     this.bet = betAmount;
     this.dealerHand = [];
     this.playerHands = [[]];
+    this.handBets = [betAmount]; // Fix 1.2: track per-hand bets
     this.currentHandIndex = 0;
     this.gameState = 'dealing';
     this.result = null;
 
     // Deal initial cards (player, dealer, player, dealer)
-    this.playerHands[0].push(this.dealCard());
-    this.dealerHand.push(this.dealCard());
-    this.playerHands[0].push(this.dealCard());
-    this.dealerHand.push(this.dealCard());
+    this.playerHands[0].push(await this.dealCard());
+    this.dealerHand.push(await this.dealCard());
+    this.playerHands[0].push(await this.dealCard());
+    this.dealerHand.push(await this.dealCard());
 
     // Check for blackjack
     if (this.getHandValue(this.playerHands[0]) === 21) {
       if (this.getHandValue(this.dealerHand) === 21) {
         this.gameState = 'finished';
-        this.result = { outcome: 'push', payout: 0 };
+        // Fix 1.1: push returns the original bet
+        this.result = { outcome: 'push', payout: this.bet };
       } else {
         this.gameState = 'finished';
         this.result = { outcome: 'blackjack', payout: this.bet * 2.5 }; // 3:2 payout
@@ -85,11 +95,11 @@ export class BlackjackEngine {
     return this.getGameState();
   }
 
-  hit() {
+  async hit() {
     if (this.gameState !== 'player-turn') return this.getGameState();
 
     const currentHand = this.playerHands[this.currentHandIndex];
-    currentHand.push(this.dealCard());
+    currentHand.push(await this.dealCard());
 
     const handValue = this.getHandValue(currentHand);
 
@@ -105,27 +115,29 @@ export class BlackjackEngine {
     return this.getGameState();
   }
 
-  stand() {
+  async stand() {
     if (this.gameState !== 'player-turn') return this.getGameState();
 
     if (this.currentHandIndex < this.playerHands.length - 1) {
       this.currentHandIndex++;
     } else {
-      this.playDealerHand();
+      await this.playDealerHand();
     }
 
     return this.getGameState();
   }
 
-  doubleDown(faceDown = true) {
+  async doubleDown(faceDown = true) {
     if (this.gameState !== 'player-turn') return this.getGameState();
     if (this.playerHands[this.currentHandIndex].length !== 2) return this.getGameState();
 
-    this.bet *= 2;
+    // Fix 1.2: only double the current hand's bet, not the global bet
+    this.handBets[this.currentHandIndex] *= 2;
+    this.bet = this.handBets.reduce((sum, b) => sum + b, 0);
 
     // Deal one card (optionally face down)
     const currentHand = this.playerHands[this.currentHandIndex];
-    const card = this.dealCard(faceDown);
+    const card = await this.dealCard(faceDown);
     currentHand.push(card);
 
     const handValue = this.getHandValue(currentHand);
@@ -139,36 +151,41 @@ export class BlackjackEngine {
       }
     } else {
       // Automatically stand after doubling
-      this.stand();
+      await this.stand();
     }
 
     return this.getGameState();
   }
 
-  split() {
+  async split() {
     if (this.gameState !== 'player-turn') return this.getGameState();
 
     const currentHand = this.playerHands[this.currentHandIndex];
     if (currentHand.length !== 2) return this.getGameState();
     if (currentHand[0].rank !== currentHand[1].rank) return this.getGameState();
 
+    // Fix 1.2: split the bet - each hand gets the original hand bet
+    const originalHandBet = this.handBets[this.currentHandIndex];
+
     // Create new hand with second card
     const newHand = [currentHand.pop()];
     this.playerHands.splice(this.currentHandIndex + 1, 0, newHand);
+    this.handBets.splice(this.currentHandIndex + 1, 0, originalHandBet);
+    this.bet = this.handBets.reduce((sum, b) => sum + b, 0);
 
     // Deal a card to each hand
-    currentHand.push(this.dealCard());
-    newHand.push(this.dealCard());
+    currentHand.push(await this.dealCard());
+    newHand.push(await this.dealCard());
 
     return this.getGameState();
   }
 
-  playDealerHand() {
+  async playDealerHand() {
     this.gameState = 'dealer-turn';
 
     // Dealer hits on 16, stands on soft 17
     while (this.shouldDealerHit()) {
-      this.dealerHand.push(this.dealCard());
+      this.dealerHand.push(await this.dealCard());
     }
 
     this.determineWinner();
@@ -181,8 +198,6 @@ export class BlackjackEngine {
     if (value > 17) return false;
 
     // Check for soft 17 (dealer stands on soft 17)
-    const hasAce = this.dealerHand.some(card => card.rank === 'A');
-    const hardValue = this.getHandValue(this.dealerHand, false);
     return false; // Stand on soft 17
   }
 
@@ -204,7 +219,8 @@ export class BlackjackEngine {
 
     this.playerHands.forEach((hand, index) => {
       const playerValue = this.getHandValue(hand);
-      const handBet = this.bet / this.playerHands.length;
+      // Fix 1.2: use per-hand bet instead of dividing global bet
+      const handBet = this.handBets[index];
 
       if (playerValue > 21) {
         handResults.push({ hand: index, outcome: 'bust', payout: 0 });
@@ -274,6 +290,7 @@ export class BlackjackEngine {
       currentHandIndex: this.currentHandIndex,
       gameState: this.gameState,
       bet: this.bet,
+      handBets: [...this.handBets],
       result: this.result,
       canSplit: this.canSplit(),
       canDoubleDown: this.canDoubleDown(),
