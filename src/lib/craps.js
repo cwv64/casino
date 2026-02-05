@@ -333,6 +333,7 @@ export class CrapsEngine {
   evaluateComeBets(total) {
     const outcomes = [];
     let justMoved = null; // Track if a Come bet just moved this roll
+    let justMovedDontCome = null; // Track if a Don't Come bet just moved this roll
 
     // Active Come bet in Come area
     if (this.bets.come > 0) {
@@ -425,6 +426,7 @@ export class CrapsEngine {
       } else if ([4, 5, 6, 8, 9, 10].includes(total)) {
         // Move Don't Come bet to the number (LAY position)
         this.bets.dontComeNumbers[total].amount += this.bets.dontCome;
+        justMovedDontCome = total; // Mark this number as just moved
         outcomes.push({
           bet: 'dontCome',
           result: 'moved',
@@ -461,12 +463,13 @@ export class CrapsEngine {
         }
       });
     } else {
-      // Check if Don't Come bet loses on this number
+      // Check if Don't Come bet loses on this number (but NOT the one that just moved)
       Object.keys(this.bets.dontComeNumbers).forEach(num => {
         const dontComeBet = this.bets.dontComeNumbers[num];
         const numInt = parseInt(num);
 
-        if (dontComeBet.amount > 0 && numInt === total) {
+        // Only evaluate if there's a bet AND it didn't just move this roll
+        if (dontComeBet.amount > 0 && numInt === total && numInt !== justMovedDontCome) {
           outcomes.push({
             bet: `dontCome${num}`,
             result: 'lose',
