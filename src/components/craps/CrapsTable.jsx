@@ -13,12 +13,20 @@ export const CrapsTable = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [highlightedBets, setHighlightedBets] = useState({ winners: [], losers: [] });
   const [movingChips, setMovingChips] = useState([]);
+  const [lastBetSnapshot, setLastBetSnapshot] = useState(null);
 
   const { gameState, rollResult, placeBet, removeBet, roll, resetBets, getTotalBets, balance } = useCraps();
   const { deposit } = useWalletStore();
 
   const totalBets = getTotalBets();
   const canRoll = totalBets > 0 && !isRolling && !isProcessing;
+
+  // Save bet snapshot when placing first bet
+  useEffect(() => {
+    if (totalBets > 0 && !lastBetSnapshot) {
+      setLastBetSnapshot(JSON.parse(JSON.stringify(gameState?.bets)));
+    }
+  }, [totalBets, lastBetSnapshot, gameState?.bets]);
 
   // Betting area component
   const BetArea = ({ label, betType, amount, onClick, onRemove, disabled, className = '', tooltip, showAmount = true }) => {
@@ -63,20 +71,26 @@ export const CrapsTable = () => {
   // Number box component for the top of the table
   const NumberBox = ({ number, displayText }) => {
     const comeBet = gameState?.bets?.comeNumbers?.[number];
+    const dontComeBet = gameState?.bets?.dontComeNumbers?.[number];
     const placeBet = gameState?.bets?.place?.[number];
     const showPuck = gameState?.puckPosition === number;
     const isPoint = gameState?.point === number;
 
     return (
       <div className="flex flex-col gap-1">
-        {/* LAY area */}
-        <BetArea
-          label="LAY"
-          betType={`lay${number}`}
-          amount={0}
-          disabled={true}
-          className="h-8 text-xs bg-black bg-opacity-30"
-        />
+        {/* LAY area - shows Don't Come bets */}
+        <div className="relative h-8 text-xs bg-black bg-opacity-30 border-2 border-white border-opacity-40 rounded-md flex items-center justify-center text-white font-bold">
+          LAY
+          {dontComeBet?.amount > 0 && (
+            <motion.div
+              initial={{ scale: 0, x: -20 }}
+              animate={{ scale: 1, x: 0 }}
+              className="absolute -top-2 -right-2"
+            >
+              <Chip value={dontComeBet.amount} className="w-10 h-10 text-xs" />
+            </motion.div>
+          )}
+        </div>
 
         {/* Main number box */}
         <div className="relative border-4 border-casino-gold bg-casino-green-dark p-4 rounded-lg min-h-[120px] flex flex-col items-center justify-center">
@@ -229,6 +243,26 @@ export const CrapsTable = () => {
       }
     });
     if (total > 0) deposit(total);
+    setLastBetSnapshot(null);
+  };
+
+  const handleClearLastBet = () => {
+    if (!lastBetSnapshot) return;
+
+    // Clear current bets
+    const refund = resetBets();
+    let total = 0;
+    Object.values(refund).forEach(val => {
+      if (typeof val === 'number') total += val;
+      else if (typeof val === 'object') {
+        Object.values(val).forEach(v => {
+          if (typeof v === 'number') total += v;
+          else if (v.amount) total += v.amount + (v.odds || 0);
+        });
+      }
+    });
+    if (total > 0) deposit(total);
+    setLastBetSnapshot(null);
   };
 
   return (
@@ -257,6 +291,37 @@ export const CrapsTable = () => {
           <div className="text-casino-gold text-sm">Total Bets</div>
           <div className="text-white text-xl font-bold">${totalBets}</div>
         </div>
+      </div>
+
+      {/* Chip Selector */}
+      <ChipSelector onSelectChip={setSelectedChip} selectedChip={selectedChip} />
+
+      {/* Controls */}
+      <div className="flex gap-4 flex-wrap justify-center">
+        <Button
+          onClick={handleRoll}
+          disabled={!canRoll}
+          variant="primary"
+          className="text-xl px-12 py-4"
+        >
+          {isRolling ? 'Rolling...' : isProcessing ? 'Processing...' : 'Roll Dice'}
+        </Button>
+
+        <Button
+          onClick={handleClearBets}
+          disabled={totalBets === 0 || isProcessing || isRolling}
+          variant="danger"
+        >
+          Clear All Bets
+        </Button>
+
+        <Button
+          onClick={handleClearLastBet}
+          disabled={!lastBetSnapshot || isProcessing || isRolling}
+          variant="secondary"
+        >
+          Clear Last Bet
+        </Button>
       </div>
 
       {/* Dice Display */}
@@ -484,29 +549,6 @@ export const CrapsTable = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Chip Selector */}
-      <ChipSelector onSelectChip={setSelectedChip} selectedChip={selectedChip} />
-
-      {/* Controls */}
-      <div className="flex gap-4 flex-wrap justify-center">
-        <Button
-          onClick={handleRoll}
-          disabled={!canRoll}
-          variant="primary"
-          className="text-xl px-12 py-4"
-        >
-          {isRolling ? 'Rolling...' : isProcessing ? 'Processing...' : 'Roll Dice'}
-        </Button>
-
-        <Button
-          onClick={handleClearBets}
-          disabled={totalBets === 0 || isProcessing || isRolling}
-          variant="danger"
-        >
-          Clear All Bets
-        </Button>
       </div>
 
       <div className="text-casino-gold text-sm text-center max-w-2xl">

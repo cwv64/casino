@@ -151,7 +151,7 @@ export const BlackjackTable = () => {
       <div className="flex gap-8">
         {gameState?.playerHands?.map((hand, index) => {
           const handVal = getHandValue(hand, true);
-          const cardDelay = hand.length * 0.3; // Delay based on number of cards
+          const cardDelay = hand.length * 0.5; // Increased delay per card
 
           return (
             <div key={index} className="flex flex-col items-center gap-4">
@@ -163,7 +163,7 @@ export const BlackjackTable = () => {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: cardDelay + 0.3 }}
+                transition={{ delay: cardDelay + 0.8 }} // Increased from 0.3 to 0.8
                 className="text-white text-lg font-semibold"
               >
                 Value: {handVal.display}
