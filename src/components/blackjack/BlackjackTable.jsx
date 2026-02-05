@@ -4,6 +4,7 @@ import { useBlackjack } from '../../hooks/useBlackjack';
 import { Hand } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { ChipSelector } from '../ui/Chip';
+import { WinCelebration } from '../ui/WinCelebration';
 
 export const BlackjackTable = () => {
   const [betAmount, setBetAmount] = useState(0);
@@ -29,11 +30,19 @@ export const BlackjackTable = () => {
     if (betAmount > 0) {
       await startHand(betAmount);
       setShowDealerHole(false);
+      // Haptic feedback
+      if (navigator.vibrate) {
+        navigator.vibrate([50, 30, 50]);
+      }
     }
   };
 
   const handlePlaceBet = () => {
     setBetAmount(prev => prev + selectedChip);
+    // Haptic feedback
+    if (navigator.vibrate) {
+      navigator.vibrate(30);
+    }
   };
 
   const handleClearBet = () => {
@@ -101,7 +110,12 @@ export const BlackjackTable = () => {
   }
 
   return (
-    <div className="flex flex-col items-center gap-8 p-8 bg-gradient-to-b from-casino-green-dark to-casino-green min-h-[600px] rounded-2xl">
+    <div className="flex flex-col items-center gap-8 p-8 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[600px] rounded-2xl shadow-felt-depth">
+      {/* Win Celebration */}
+      <WinCelebration
+        show={gameState?.result && showDealerHole && (gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack')}
+      />
+
       {/* Dealer's Hand */}
       <div className="flex flex-col items-center gap-4">
         {gameState?.dealerHand && gameState.dealerHand.length > 0 && (
@@ -112,16 +126,6 @@ export const BlackjackTable = () => {
               label="Dealer"
               dealDelay={0.5}
             />
-            {showDealerHole && gameState.gameState === 'finished' && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-white text-lg font-semibold"
-              >
-                Value: {getHandValue(gameState.dealerHand)}
-              </motion.div>
-            )}
           </>
         )}
       </div>
@@ -132,13 +136,23 @@ export const BlackjackTable = () => {
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="bg-charcoal-dark px-8 py-4 rounded-lg border-2 border-casino-gold"
+          className={`
+            px-8 py-4 rounded-xl border-4 backdrop-blur-lg
+            ${gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack'
+              ? 'bg-gradient-to-br from-green-600/80 to-green-800/80 border-green-400 shadow-glow-green'
+              : gameState.result.outcome === 'push'
+              ? 'bg-black/60 border-casino-gold shadow-glow-gold'
+              : 'bg-gradient-to-br from-red-600/80 to-red-800/80 border-red-400 shadow-glow-red'}
+          `}
         >
           <div className="text-center">
-            <div className="text-casino-gold text-2xl font-bold mb-2">
+            <div className={`text-3xl font-black mb-2 drop-shadow-lg ${
+              gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack'
+              ? 'text-green-100' : gameState.result.outcome === 'push' ? 'text-casino-gold' : 'text-red-100'
+            }`}>
               {gameState.result.outcome.toUpperCase()}
             </div>
-            <div className="text-white text-xl">
+            <div className="text-white text-xl font-semibold">
               {gameState.result.payout > 0 && `Won $${gameState.result.payout}`}
               {gameState.result.payout === 0 && gameState.result.outcome !== 'push' && 'Lost'}
               {gameState.result.outcome === 'push' && 'Push - Bet Returned'}
@@ -150,9 +164,6 @@ export const BlackjackTable = () => {
       {/* Player's Hands */}
       <div className="flex gap-8">
         {gameState?.playerHands?.map((hand, index) => {
-          const handVal = getHandValue(hand, true);
-          const cardDelay = hand.length * 0.5; // Increased delay per card
-
           return (
             <div key={index} className="flex flex-col items-center gap-4">
               <Hand
@@ -160,15 +171,6 @@ export const BlackjackTable = () => {
                 label={`Player${gameState.playerHands.length > 1 ? ` ${index + 1}` : ''}`}
                 dealDelay={0}
               />
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: cardDelay + 0.8 }} // Increased from 0.3 to 0.8
-                className="text-white text-lg font-semibold"
-              >
-                Value: {handVal.display}
-                {handVal.soft > 21 && ' - BUST!'}
-              </motion.div>
               {gameState.currentHandIndex === index && gameState.gameState === 'player-turn' && (
                 <div className="text-casino-gold animate-pulse">← Active</div>
               )}

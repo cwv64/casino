@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { ChipSelector, Chip } from '../ui/Chip';
 import { DealerPuck } from '../ui/DealerPuck';
 import { useWalletStore } from '../../stores/walletStore';
+import { WinCelebration } from '../ui/WinCelebration';
 
 export const CrapsTable = () => {
   const [selectedChip, setSelectedChip] = useState(10);
@@ -14,6 +15,7 @@ export const CrapsTable = () => {
   const [highlightedBets, setHighlightedBets] = useState({ winners: [], losers: [] });
   const [movingChips, setMovingChips] = useState([]);
   const [lastBetSnapshot, setLastBetSnapshot] = useState(null);
+  const [showWinCelebration, setShowWinCelebration] = useState(false);
 
   const { gameState, rollResult, placeBet, removeBet, roll, resetBets, getTotalBets, balance } = useCraps();
   const { deposit } = useWalletStore();
@@ -32,10 +34,13 @@ export const CrapsTable = () => {
   const BetArea = ({ label, betType, amount, onClick, onRemove, disabled, className = '', tooltip, showAmount = true }) => {
     const hasBet = amount > 0;
     const isDisabled = disabled || isProcessing || isRolling;
+    const isWinner = highlightedBets.winners.includes(betType);
+    const isLoser = highlightedBets.losers.includes(betType);
 
     return (
       <motion.button
-        whileHover={!isDisabled ? { scale: 1.02 } : {}}
+        whileHover={!isDisabled ? { scale: 1.05, y: -2 } : {}}
+        whileTap={!isDisabled ? { scale: 0.98 } : {}}
         onClick={() => !isDisabled && onClick && onClick()}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -43,10 +48,13 @@ export const CrapsTable = () => {
         }}
         disabled={isDisabled}
         className={`
-          relative border-2 rounded-md flex items-center justify-center
-          font-bold transition-all duration-200
-          ${!isDisabled ? 'cursor-pointer hover:border-casino-gold' : 'opacity-50 cursor-not-allowed'}
-          ${hasBet ? 'border-casino-gold bg-casino-gold bg-opacity-10' : 'border-white border-opacity-40'}
+          relative border-2 rounded-xl flex items-center justify-center
+          font-bold transition-all duration-300
+          backdrop-blur-sm
+          ${!isDisabled ? 'cursor-pointer hover:border-casino-gold hover:shadow-glow-gold' : 'opacity-50 cursor-not-allowed'}
+          ${hasBet ? 'border-casino-gold bg-casino-gold/20 shadow-lg' : 'border-white/40 bg-black/20'}
+          ${isWinner ? 'border-green-400 bg-green-500/30 shadow-glow-green animate-pulse' : ''}
+          ${isLoser ? 'border-red-400 bg-red-500/30 shadow-glow-red' : ''}
           ${className}
         `}
         title={tooltip}
@@ -93,7 +101,7 @@ export const CrapsTable = () => {
         </div>
 
         {/* Main number box */}
-        <div className="relative border-4 border-casino-gold bg-casino-green-dark p-4 rounded-lg min-h-[120px] flex flex-col items-center justify-center">
+        <div className={`relative border-4 ${isPoint ? 'border-casino-gold shadow-glow-gold-lg animate-pulse-glow' : 'border-casino-gold/60'} bg-gradient-to-br from-casino-green-dark to-black/60 backdrop-blur-sm p-4 rounded-xl min-h-[120px] flex flex-col items-center justify-center`}>
           {/* Dealer Puck */}
           {showPuck && (
             <motion.div
@@ -160,6 +168,10 @@ export const CrapsTable = () => {
   const handlePlaceBet = (betType, number = null) => {
     if (balance >= selectedChip) {
       placeBet(betType, selectedChip, number);
+      // Haptic feedback
+      if (navigator.vibrate) {
+        navigator.vibrate(30);
+      }
     }
   };
 
@@ -175,6 +187,11 @@ export const CrapsTable = () => {
 
     setIsRolling(true);
     setIsProcessing(true);
+
+    // Haptic feedback for roll
+    if (navigator.vibrate) {
+      navigator.vibrate([50, 30, 50]);
+    }
 
     // Roll the dice
     const result = await roll();
@@ -216,6 +233,8 @@ export const CrapsTable = () => {
         // Deposit winnings
         if (totalPayout > 0) {
           deposit(totalPayout);
+          setShowWinCelebration(true);
+          setTimeout(() => setShowWinCelebration(false), 3000);
         }
 
         // Clear highlights after delay
@@ -266,11 +285,14 @@ export const CrapsTable = () => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-6 p-6 bg-gradient-to-b from-casino-green-dark to-casino-green min-h-[900px] rounded-2xl">
+    <div className="flex flex-col items-center gap-6 p-6 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[900px] rounded-2xl shadow-felt-depth">
+      {/* Win Celebration */}
+      <WinCelebration show={showWinCelebration} />
+
       {/* Phase and Point Display */}
       <div className="flex gap-8 items-center">
-        <div className="bg-charcoal-dark px-6 py-3 rounded-lg border-2 border-casino-gold">
-          <div className="text-casino-gold text-sm">Phase</div>
+        <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-casino-gold shadow-glow-gold">
+          <div className="text-casino-gold text-sm font-semibold">Phase</div>
           <div className="text-white text-xl font-bold capitalize">
             {gameState?.phase === 'comeOut' ? 'Come Out Roll' : 'Point'}
           </div>
@@ -280,15 +302,15 @@ export const CrapsTable = () => {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="bg-casino-gold px-8 py-4 rounded-lg shadow-xl"
+            className="bg-gradient-to-br from-yellow-400 via-casino-gold to-yellow-600 px-8 py-4 rounded-xl shadow-glow-gold-lg border-4 border-yellow-300"
           >
-            <div className="text-charcoal text-sm font-semibold">Point</div>
-            <div className="text-charcoal text-4xl font-bold">{gameState.point}</div>
+            <div className="text-charcoal text-sm font-bold">Point</div>
+            <div className="text-charcoal text-4xl font-black drop-shadow-lg">{gameState.point}</div>
           </motion.div>
         )}
 
-        <div className="bg-charcoal-dark px-6 py-3 rounded-lg border-2 border-casino-gold">
-          <div className="text-casino-gold text-sm">Total Bets</div>
+        <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-casino-gold shadow-glow-gold">
+          <div className="text-casino-gold text-sm font-semibold">Total Bets</div>
           <div className="text-white text-xl font-bold">${totalBets}</div>
         </div>
       </div>
@@ -325,7 +347,7 @@ export const CrapsTable = () => {
       </div>
 
       {/* Dice Display */}
-      <div className="bg-charcoal-dark p-8 rounded-xl border-4 border-casino-gold min-h-[150px] flex items-center justify-center w-full max-w-md">
+      <div className="bg-black/50 backdrop-blur-lg p-8 rounded-2xl border-4 border-casino-gold shadow-glow-gold-lg min-h-[150px] flex items-center justify-center w-full max-w-md">
         {rollResult ? (
           <DicePair
             die1={rollResult.roll.die1}
@@ -370,7 +392,7 @@ export const CrapsTable = () => {
       </AnimatePresence>
 
       {/* Main Craps Table Layout */}
-      <div className="w-full max-w-7xl bg-casino-green border-8 border-casino-gold rounded-3xl p-8 relative">
+      <div className="w-full max-w-7xl bg-gradient-to-br from-casino-green-dark via-casino-green to-casino-green-light bg-felt-texture border-8 border-casino-gold shadow-glow-gold-lg rounded-3xl p-8 relative">
 
         {/* Top: Number Boxes (4, 5, SIX, 8, NINE, 10) + Don't Come Bar */}
         <div className="grid grid-cols-7 gap-3 mb-6">
