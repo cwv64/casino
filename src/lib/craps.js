@@ -32,6 +32,15 @@ export class CrapsEngine {
         9: { amount: 0, odds: 0 },
         10: { amount: 0, odds: 0 }
       },
+      // Don't Come bets that have moved to numbers
+      dontComeNumbers: {
+        4: { amount: 0, odds: 0 },
+        5: { amount: 0, odds: 0 },
+        6: { amount: 0, odds: 0 },
+        8: { amount: 0, odds: 0 },
+        9: { amount: 0, odds: 0 },
+        10: { amount: 0, odds: 0 }
+      },
       // Place bets
       place: {
         4: 0,
@@ -414,14 +423,63 @@ export class CrapsEngine {
         });
         this.bets.dontCome = 0;
       } else if ([4, 5, 6, 8, 9, 10].includes(total)) {
-        // Don't Come bets don't move in this implementation
-        // Just note it established
+        // Move Don't Come bet to the number (LAY position)
+        this.bets.dontComeNumbers[total].amount += this.bets.dontCome;
         outcomes.push({
           bet: 'dontCome',
-          result: 'established',
-          message: `Don't Come established on ${total}`
+          result: 'moved',
+          amount: this.bets.dontCome,
+          toNumber: total,
+          message: `Don't Come moved to ${total}`
         });
+        this.bets.dontCome = 0;
       }
+    }
+
+    // Check Don't Come bets on numbers
+    // Don't Come wins on 7, loses if number hits
+    if (total === 7) {
+      Object.keys(this.bets.dontComeNumbers).forEach(num => {
+        const dontComeBet = this.bets.dontComeNumbers[num];
+        const numInt = parseInt(num);
+
+        if (dontComeBet.amount > 0) {
+          const oddsPayout = dontComeBet.odds > 0 ? this.calculateOddsPayout(numInt, dontComeBet.odds) : 0;
+          const totalPayout = dontComeBet.amount * 2 + dontComeBet.odds + oddsPayout;
+
+          outcomes.push({
+            bet: `dontCome${num}`,
+            result: 'win',
+            amount: dontComeBet.amount + dontComeBet.odds,
+            payout: totalPayout,
+            number: numInt,
+            message: `Don't Come on ${num} wins!`
+          });
+
+          dontComeBet.amount = 0;
+          dontComeBet.odds = 0;
+        }
+      });
+    } else {
+      // Check if Don't Come bet loses on this number
+      Object.keys(this.bets.dontComeNumbers).forEach(num => {
+        const dontComeBet = this.bets.dontComeNumbers[num];
+        const numInt = parseInt(num);
+
+        if (dontComeBet.amount > 0 && numInt === total) {
+          outcomes.push({
+            bet: `dontCome${num}`,
+            result: 'lose',
+            amount: dontComeBet.amount + dontComeBet.odds,
+            payout: 0,
+            number: numInt,
+            message: `Don't Come on ${num} loses`
+          });
+
+          dontComeBet.amount = 0;
+          dontComeBet.odds = 0;
+        }
+      });
     }
 
     return outcomes;
@@ -703,6 +761,14 @@ export class CrapsEngine {
       field: 0,
       odds: 0,
       comeNumbers: {
+        4: { amount: 0, odds: 0 },
+        5: { amount: 0, odds: 0 },
+        6: { amount: 0, odds: 0 },
+        8: { amount: 0, odds: 0 },
+        9: { amount: 0, odds: 0 },
+        10: { amount: 0, odds: 0 }
+      },
+      dontComeNumbers: {
         4: { amount: 0, odds: 0 },
         5: { amount: 0, odds: 0 },
         6: { amount: 0, odds: 0 },
