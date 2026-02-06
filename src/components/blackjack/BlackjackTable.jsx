@@ -14,12 +14,37 @@ export const BlackjackTable = () => {
   const [showDealerHole, setShowDealerHole] = useState(false);
   const [doubleDownFaceDown, setDoubleDownFaceDown] = useState(true);
   const [betError, setBetError] = useState(null);
+  const [showHandValues, setShowHandValues] = useState(false);
   const { gameState, isInitialized, startHand, hit, stand, doubleDown, split } = useBlackjack();
   const { balance } = useWalletStore();
+
+  // Delay showing hand values until card deal animations complete
+  useEffect(() => {
+    if (gameState?.gameState === 'player-turn') {
+      // Initial deal: 4 cards animate in over ~2s
+      if (!showHandValues) {
+        const timer = setTimeout(() => setShowHandValues(true), 1800);
+        return () => clearTimeout(timer);
+      }
+    } else if (gameState?.gameState === 'betting') {
+      setShowHandValues(false);
+    }
+  }, [gameState?.gameState]);
+
+  // Brief delay when hitting to let card animation play
+  useEffect(() => {
+    const cardCount = gameState?.playerHands?.reduce((n, h) => n + h.length, 0) || 0;
+    if (gameState?.gameState === 'player-turn' && showHandValues && cardCount > 0) {
+      setShowHandValues(false);
+      const timer = setTimeout(() => setShowHandValues(true), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState?.playerHands?.reduce((n, h) => n + h.length, 0)]);
 
   useEffect(() => {
     if (gameState?.gameState === 'finished') {
       setShowDealerHole(false);
+      setShowHandValues(true); // Show final values immediately
       const timer = setTimeout(() => {
         setShowDealerHole(true);
         // Fix 5.4: Play result sound
@@ -163,13 +188,15 @@ export const BlackjackTable = () => {
               label="Dealer"
               dealDelay={0.5}
             />
-            {/* Fix 5.1: Show dealer hand value */}
-            <div className="text-white text-sm sm:text-lg font-bold bg-black/40 px-3 py-1 rounded-lg">
-              {showDealerHole || gameState.gameState === 'betting'
-                ? getHandValue(gameState.dealerHand, true).display || getHandValue(gameState.dealerHand)
-                : '?'
-              }
-            </div>
+            {/* Fix 5.1: Show dealer hand value (only after deal animation) */}
+            {showHandValues && (
+              <div className="text-white text-sm sm:text-lg font-bold bg-black/40 px-3 py-1 rounded-lg">
+                {showDealerHole
+                  ? getHandValue(gameState.dealerHand, true).display || getHandValue(gameState.dealerHand)
+                  : '?'
+                }
+              </div>
+            )}
           </>
         )}
       </div>
@@ -216,11 +243,15 @@ export const BlackjackTable = () => {
                 label={`Player${gameState.playerHands.length > 1 ? ` ${index + 1}` : ''}`}
                 dealDelay={0}
               />
-              {/* Fix 5.1: Show player hand value */}
-              {hand.length > 0 && (
-                <div className="text-white text-sm sm:text-lg font-bold bg-black/40 px-3 py-1 rounded-lg">
+              {/* Fix 5.1: Show player hand value (only after deal animation) */}
+              {hand.length > 0 && showHandValues && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-white text-sm sm:text-lg font-bold bg-black/40 px-3 py-1 rounded-lg"
+                >
                   {handVal.display || handVal}
-                </div>
+                </motion.div>
               )}
               {gameState.currentHandIndex === index && gameState.gameState === 'player-turn' && (
                 <div className="text-casino-gold animate-pulse text-sm">← Active</div>

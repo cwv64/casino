@@ -745,6 +745,14 @@ export class CrapsEngine {
       const amount = this.bets.comeNumbers[number].amount;
       this.bets.comeNumbers[number].amount = 0;
       return amount;
+    } else if (betType === 'hardway' && number) {
+      const amount = this.bets.hardways[number] || 0;
+      this.bets.hardways[number] = 0;
+      return amount;
+    } else if (betType === 'horn' && number) {
+      const amount = this.bets.horn[number] || 0;
+      this.bets.horn[number] = 0;
+      return amount;
     } else {
       const amount = this.bets[betType] || 0;
       this.bets[betType] = 0;
