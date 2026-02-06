@@ -11,7 +11,7 @@ export const Header = ({ onOpenSettings, onOpenInfo, onOpenRules }) => {
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 sm:gap-4">
-          <img src="/logo.svg" alt="Lucky Roll Casino" className="w-8 h-8 sm:w-12 sm:h-12 rounded-full" />
+          <img src="/logo.png" alt="Lucky Roll Casino" className="w-8 h-8 sm:w-12 sm:h-12 rounded-full" />
           <h1 className="text-lg sm:text-3xl font-bold bg-gradient-to-r from-casino-gold to-yellow-500 bg-clip-text text-transparent">
             Lucky Roll Casino
           </h1>
