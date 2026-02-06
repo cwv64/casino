@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCraps } from '../../hooks/useCraps';
 import { DicePair } from '../ui/Dice';
@@ -7,37 +7,17 @@ import { ChipSelector, Chip } from '../ui/Chip';
 import { DealerPuck } from '../ui/DealerPuck';
 import { useWalletStore } from '../../stores/walletStore';
 import { WinCelebration } from '../ui/WinCelebration';
+import { X } from 'lucide-react';
 
-export const CrapsTable = () => {
-  const [selectedChip, setSelectedChip] = useState(10);
-  const [isRolling, setIsRolling] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [highlightedBets, setHighlightedBets] = useState({ winners: [], losers: [] });
-  const [movingChips, setMovingChips] = useState([]);
-  const [lastBetSnapshot, setLastBetSnapshot] = useState(null);
-  const [showWinCelebration, setShowWinCelebration] = useState(false);
+// Extracted to top-level to avoid re-creation on every render (fix 6.4)
+const BetArea = ({ label, betType, amount, onClick, onRemove, disabled, className = '', tooltip, showAmount = true, highlightedBets, isProcessing, isRolling }) => {
+  const hasBet = amount > 0;
+  const isDisabled = disabled || isProcessing || isRolling;
+  const isWinner = highlightedBets.winners.includes(betType);
+  const isLoser = highlightedBets.losers.includes(betType);
 
-  const { gameState, rollResult, placeBet, removeBet, roll, resetBets, getTotalBets, balance } = useCraps();
-  const { deposit } = useWalletStore();
-
-  const totalBets = getTotalBets();
-  const canRoll = totalBets > 0 && !isRolling && !isProcessing;
-
-  // Save bet snapshot when placing first bet
-  useEffect(() => {
-    if (totalBets > 0 && !lastBetSnapshot) {
-      setLastBetSnapshot(JSON.parse(JSON.stringify(gameState?.bets)));
-    }
-  }, [totalBets, lastBetSnapshot, gameState?.bets]);
-
-  // Betting area component
-  const BetArea = ({ label, betType, amount, onClick, onRemove, disabled, className = '', tooltip, showAmount = true }) => {
-    const hasBet = amount > 0;
-    const isDisabled = disabled || isProcessing || isRolling;
-    const isWinner = highlightedBets.winners.includes(betType);
-    const isLoser = highlightedBets.losers.includes(betType);
-
-    return (
+  return (
+    <div className="relative">
       <motion.button
         whileHover={!isDisabled ? { scale: 1.05, y: -2 } : {}}
         whileTap={!isDisabled ? { scale: 0.98 } : {}}
@@ -49,7 +29,7 @@ export const CrapsTable = () => {
         disabled={isDisabled}
         className={`
           relative border-2 rounded-xl flex items-center justify-center
-          font-bold transition-all duration-300
+          font-bold transition-all duration-300 w-full h-full
           backdrop-blur-sm
           ${!isDisabled ? 'cursor-pointer hover:border-casino-gold hover:shadow-glow-gold' : 'opacity-50 cursor-not-allowed'}
           ${hasBet ? 'border-casino-gold bg-casino-gold/20 shadow-lg' : 'border-white/40 bg-black/20'}
@@ -69,121 +49,152 @@ export const CrapsTable = () => {
             animate={{ scale: 1 }}
             className="absolute -top-3 -right-3"
           >
-            <Chip value={amount} className="w-12 h-12 text-xs" />
+            <Chip value={amount} className="w-8 h-8 sm:w-12 sm:h-12 text-[0.5rem] sm:text-xs" />
           </motion.div>
         )}
       </motion.button>
-    );
-  };
 
-  // Number box component for the top of the table
-  const NumberBox = ({ number, displayText }) => {
-    const comeBet = gameState?.bets?.comeNumbers?.[number];
-    const dontComeBet = gameState?.bets?.dontComeNumbers?.[number];
-    const placeBet = gameState?.bets?.place?.[number];
-    const showPuck = gameState?.puckPosition === number;
-    const isPoint = gameState?.point === number;
+      {/* Fix 3.5: Touch-friendly remove button (visible on mobile and desktop) */}
+      {hasBet && onRemove && !isDisabled && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className="absolute -top-2 -left-2 z-20 w-5 h-5 sm:w-6 sm:h-6 bg-red-600 border border-red-400 rounded-full flex items-center justify-center text-white shadow-lg"
+          aria-label={`Remove ${betType} bet`}
+        >
+          <X size={10} />
+        </button>
+      )}
+    </div>
+  );
+};
 
-    return (
-      <div className="flex flex-col gap-1">
-        {/* LAY area - shows Don't Come bets */}
-        <div className="relative h-6 sm:h-8 text-[0.65rem] sm:text-xs bg-black bg-opacity-30 border-2 border-white border-opacity-40 rounded-md flex items-center justify-center text-white font-bold">
-          LAY
-          {dontComeBet?.amount > 0 && (
-            <motion.div
-              initial={{ scale: 0, x: -20 }}
-              animate={{ scale: 1, x: 0 }}
-              className="absolute -top-2 -right-2"
-            >
-              <Chip value={dontComeBet.amount} className="w-8 h-8 sm:w-10 sm:h-10 text-xs" />
-            </motion.div>
-          )}
-        </div>
+// Extracted to top-level (fix 6.4)
+const NumberBox = ({ number, displayText, gameState, handlePlaceBet, handleRemoveBet, highlightedBets, isProcessing, isRolling }) => {
+  const comeBet = gameState?.bets?.comeNumbers?.[number];
+  const dontComeBet = gameState?.bets?.dontComeNumbers?.[number];
+  const placeBetAmt = gameState?.bets?.place?.[number];
+  const showPuck = gameState?.puckPosition === number;
+  const isPoint = gameState?.point === number;
+  const betAreaProps = { highlightedBets, isProcessing, isRolling };
 
-        {/* Main number box */}
-        <div className={`relative border-2 sm:border-4 ${isPoint ? 'border-casino-gold shadow-glow-gold-lg animate-pulse-glow' : 'border-casino-gold/60'} bg-gradient-to-br from-casino-green-dark to-black/60 backdrop-blur-sm p-2 sm:p-4 rounded-lg sm:rounded-xl min-h-[80px] sm:min-h-[120px] flex flex-col items-center justify-center overflow-hidden`}>
-          {/* Dealer Puck */}
-          {showPuck && (
-            <motion.div
-              initial={{ y: -50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              className="absolute -top-6 sm:-top-8 z-10"
-            >
-              <DealerPuck isOn={true} position={number} />
-            </motion.div>
-          )}
-
-          {/* Number display - Responsive sizing with clamp */}
-          <div
-            className={`font-bold ${isPoint ? 'text-casino-gold' : 'text-white'}`}
-            style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)' }}
+  return (
+    <div className="flex flex-col gap-0.5 sm:gap-1">
+      {/* LAY area */}
+      <div className="relative h-5 sm:h-8 text-[0.5rem] sm:text-xs bg-black bg-opacity-30 border border-white border-opacity-40 rounded-md flex items-center justify-center text-white font-bold">
+        LAY
+        {dontComeBet?.amount > 0 && (
+          <motion.div
+            initial={{ scale: 0, x: -20 }}
+            animate={{ scale: 1, x: 0 }}
+            className="absolute -top-2 -right-2"
           >
-            {displayText || number}
-          </div>
-
-          {/* Come bet on this number */}
-          {comeBet?.amount > 0 && (
-            <motion.div
-              initial={{ scale: 0, y: -20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="absolute top-1 right-1 sm:top-2 sm:right-2"
-            >
-              <Chip value={comeBet.amount} className="w-8 h-8 sm:w-10 sm:h-10 text-xs" />
-            </motion.div>
-          )}
-
-          {/* Place bet indicator */}
-          {placeBet > 0 && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="absolute bottom-1 left-1 sm:bottom-2 sm:left-2"
-            >
-              <Chip value={placeBet} className="w-8 h-8 sm:w-10 sm:h-10 text-xs" />
-            </motion.div>
-          )}
-        </div>
-
-        {/* PLACE / BUY buttons */}
-        <div className="grid grid-cols-2 gap-1">
-          <BetArea
-            label="PLACE"
-            betType={`place${number}`}
-            amount={gameState?.bets?.place?.[number] || 0}
-            onClick={() => handlePlaceBet('place', number)}
-            onRemove={() => handleRemoveBet('place', number)}
-            disabled={false}
-            className="h-8 sm:h-10 text-[0.65rem] sm:text-xs bg-casino-green"
-            showAmount={false}
-          />
-          <BetArea
-            label="BUY"
-            betType={`buy${number}`}
-            amount={0}
-            disabled={true}
-            className="h-8 sm:h-10 text-[0.65rem] sm:text-xs bg-casino-green opacity-50"
-          />
-        </div>
+            <Chip value={dontComeBet.amount} className="w-6 h-6 sm:w-10 sm:h-10 text-[0.45rem] sm:text-xs" />
+          </motion.div>
+        )}
       </div>
-    );
-  };
 
-  const handlePlaceBet = (betType, number = null) => {
+      {/* Main number box */}
+      <div className={`relative border-2 sm:border-4 ${isPoint ? 'border-casino-gold shadow-glow-gold-lg animate-pulse-glow' : 'border-casino-gold/60'} bg-gradient-to-br from-casino-green-dark to-black/60 backdrop-blur-sm p-1 sm:p-4 rounded-lg sm:rounded-xl min-h-[55px] sm:min-h-[120px] flex flex-col items-center justify-center overflow-hidden`}>
+        {showPuck && (
+          <motion.div
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="absolute -top-5 sm:-top-8 z-10"
+          >
+            <DealerPuck isOn={true} position={number} />
+          </motion.div>
+        )}
+
+        <div
+          className={`font-bold ${isPoint ? 'text-casino-gold' : 'text-white'}`}
+          style={{ fontSize: 'clamp(1rem, 4vw, 3rem)' }}
+        >
+          {displayText || number}
+        </div>
+
+        {comeBet?.amount > 0 && (
+          <motion.div
+            initial={{ scale: 0, y: -20 }}
+            animate={{ scale: 1, y: 0 }}
+            className="absolute top-0.5 right-0.5 sm:top-2 sm:right-2"
+          >
+            <Chip value={comeBet.amount} className="w-6 h-6 sm:w-10 sm:h-10 text-[0.45rem] sm:text-xs" />
+          </motion.div>
+        )}
+
+        {placeBetAmt > 0 && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="absolute bottom-0.5 left-0.5 sm:bottom-2 sm:left-2"
+          >
+            <Chip value={placeBetAmt} className="w-6 h-6 sm:w-10 sm:h-10 text-[0.45rem] sm:text-xs" />
+          </motion.div>
+        )}
+      </div>
+
+      {/* PLACE / BUY buttons */}
+      <div className="grid grid-cols-2 gap-0.5">
+        <BetArea
+          label="PLACE"
+          betType={`place${number}`}
+          amount={gameState?.bets?.place?.[number] || 0}
+          onClick={() => handlePlaceBet('place', number)}
+          onRemove={() => handleRemoveBet('place', number)}
+          disabled={false}
+          className="h-6 sm:h-10 text-[0.45rem] sm:text-xs bg-casino-green"
+          showAmount={false}
+          {...betAreaProps}
+        />
+        <BetArea
+          label="BUY"
+          betType={`buy${number}`}
+          amount={0}
+          disabled={true}
+          className="h-6 sm:h-10 text-[0.45rem] sm:text-xs bg-casino-green opacity-50"
+          {...betAreaProps}
+        />
+      </div>
+    </div>
+  );
+};
+
+export const CrapsTable = () => {
+  const [selectedChip, setSelectedChip] = useState(10);
+  const [isRolling, setIsRolling] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [highlightedBets, setHighlightedBets] = useState({ winners: [], losers: [] });
+  const [movingChips, setMovingChips] = useState([]);
+  const [lastBetSnapshot, setLastBetSnapshot] = useState(null);
+  const [showWinCelebration, setShowWinCelebration] = useState(false);
+
+  const { gameState, rollResult, placeBet, removeBet, roll, resetBets, getTotalBets, balance } = useCraps();
+  const { deposit } = useWalletStore();
+
+  const totalBets = getTotalBets();
+  const canRoll = totalBets > 0 && !isRolling && !isProcessing;
+
+  useEffect(() => {
+    if (totalBets > 0 && !lastBetSnapshot) {
+      setLastBetSnapshot(JSON.parse(JSON.stringify(gameState?.bets)));
+    }
+  }, [totalBets, lastBetSnapshot, gameState?.bets]);
+
+  const handlePlaceBet = useCallback((betType, number = null) => {
     if (balance >= selectedChip) {
       placeBet(betType, selectedChip, number);
-      // Haptic feedback
       if (navigator.vibrate) {
         navigator.vibrate(30);
       }
     }
-  };
+  }, [balance, selectedChip, placeBet]);
 
-  const handleRemoveBet = (betType, number = null) => {
+  const handleRemoveBet = useCallback((betType, number = null) => {
     const refunded = removeBet(betType, number);
     if (refunded) {
       deposit(refunded);
     }
-  };
+  }, [removeBet, deposit]);
 
   const handleRoll = async () => {
     if (!canRoll) return;
@@ -191,25 +202,20 @@ export const CrapsTable = () => {
     setIsRolling(true);
     setIsProcessing(true);
 
-    // Haptic feedback for roll
     if (navigator.vibrate) {
       navigator.vibrate([50, 30, 50]);
     }
 
-    // Roll the dice
     const result = await roll();
 
-    // Show dice animation
     setTimeout(async () => {
       setIsRolling(false);
 
-      // Process outcomes
       if (result.outcomes && result.outcomes.length > 0) {
         const winners = [];
         const losers = [];
         let totalPayout = 0;
 
-        // Check for Come bet movement
         const comeMovement = result.outcomes.find(o => o.result === 'moved');
         if (comeMovement) {
           setMovingChips([{
@@ -217,8 +223,6 @@ export const CrapsTable = () => {
             to: comeMovement.toNumber,
             amount: comeMovement.amount
           }]);
-
-          // Clear animation after 1 second
           setTimeout(() => setMovingChips([]), 1000);
         }
 
@@ -227,7 +231,6 @@ export const CrapsTable = () => {
             winners.push(outcome.bet);
             totalPayout += outcome.payout;
           } else if (outcome.result === 'push') {
-            // Fix 1.8: push refunds the bet amount
             totalPayout += outcome.payout;
           } else if (outcome.result === 'lose') {
             losers.push(outcome.bet);
@@ -236,14 +239,12 @@ export const CrapsTable = () => {
 
         setHighlightedBets({ winners, losers });
 
-        // Deposit winnings
         if (totalPayout > 0) {
           deposit(totalPayout);
           setShowWinCelebration(true);
           setTimeout(() => setShowWinCelebration(false), 3000);
         }
 
-        // Clear highlights after delay
         setTimeout(() => {
           setHighlightedBets({ winners: [], losers: [] });
           setIsProcessing(false);
@@ -256,7 +257,6 @@ export const CrapsTable = () => {
 
   const handleClearBets = () => {
     const refund = resetBets();
-    // Calculate total refund
     let total = 0;
     Object.values(refund).forEach(val => {
       if (typeof val === 'number') total += val;
@@ -273,8 +273,6 @@ export const CrapsTable = () => {
 
   const handleClearLastBet = () => {
     if (!lastBetSnapshot) return;
-
-    // Clear current bets
     const refund = resetBets();
     let total = 0;
     Object.values(refund).forEach(val => {
@@ -290,9 +288,10 @@ export const CrapsTable = () => {
     setLastBetSnapshot(null);
   };
 
+  const betAreaProps = { highlightedBets, isProcessing, isRolling };
+
   return (
-    <div className="flex flex-col items-center gap-4 sm:gap-6 p-3 sm:p-6 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[900px] rounded-2xl shadow-felt-depth max-w-full box-border overflow-x-hidden">
-      {/* Win Celebration */}
+    <div className="flex flex-col items-center gap-3 sm:gap-6 p-2 sm:p-6 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[700px] sm:min-h-[900px] rounded-2xl shadow-felt-depth max-w-full box-border overflow-x-hidden">
       <WinCelebration show={showWinCelebration} />
 
       {/* Phase and Point Display */}
@@ -321,16 +320,15 @@ export const CrapsTable = () => {
         </div>
       </div>
 
-      {/* Chip Selector */}
       <ChipSelector onSelectChip={setSelectedChip} selectedChip={selectedChip} />
 
       {/* Controls */}
-      <div className="flex gap-4 flex-wrap justify-center">
+      <div className="flex gap-2 sm:gap-4 flex-wrap justify-center">
         <Button
           onClick={handleRoll}
           disabled={!canRoll}
           variant="primary"
-          className="text-xl px-12 py-4"
+          className="text-base sm:text-xl px-6 sm:px-12 py-3 sm:py-4"
         >
           {isRolling ? 'Rolling...' : isProcessing ? 'Processing...' : 'Roll Dice'}
         </Button>
@@ -340,7 +338,7 @@ export const CrapsTable = () => {
           disabled={totalBets === 0 || isProcessing || isRolling}
           variant="danger"
         >
-          Clear All Bets
+          Clear All
         </Button>
 
         <Button
@@ -348,12 +346,12 @@ export const CrapsTable = () => {
           disabled={!lastBetSnapshot || isProcessing || isRolling}
           variant="secondary"
         >
-          Clear Last Bet
+          Clear Last
         </Button>
       </div>
 
       {/* Dice Display */}
-      <div className="bg-black/50 backdrop-blur-lg p-4 sm:p-8 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-casino-gold shadow-glow-gold-lg min-h-[100px] sm:min-h-[150px] flex items-center justify-center w-full max-w-md">
+      <div className="bg-black/50 backdrop-blur-lg p-3 sm:p-8 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-casino-gold shadow-glow-gold-lg min-h-[80px] sm:min-h-[150px] flex items-center justify-center w-full max-w-md">
         {rollResult ? (
           <DicePair
             die1={rollResult.roll.die1}
@@ -361,7 +359,7 @@ export const CrapsTable = () => {
             isRolling={isRolling}
           />
         ) : (
-          <div className="text-casino-gold text-2xl font-bold">Ready to roll!</div>
+          <div className="text-casino-gold text-lg sm:text-2xl font-bold">Ready to roll!</div>
         )}
       </div>
 
@@ -372,7 +370,7 @@ export const CrapsTable = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="flex flex-wrap gap-2 justify-center max-w-4xl"
+            className="flex flex-wrap gap-1 sm:gap-2 justify-center max-w-4xl"
           >
             {rollResult.outcomes.map((outcome, idx) => (
               outcome.message && (
@@ -381,7 +379,7 @@ export const CrapsTable = () => {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   className={`
-                    px-4 py-2 rounded-lg border-2 font-semibold
+                    px-2 sm:px-4 py-1 sm:py-2 rounded-lg border-2 font-semibold text-xs sm:text-base
                     ${outcome.result === 'win' ? 'bg-green-600 border-green-400 text-white' : ''}
                     ${outcome.result === 'lose' ? 'bg-red-600 border-red-400 text-white' : ''}
                     ${outcome.result === 'moved' ? 'bg-blue-600 border-blue-400 text-white' : ''}
@@ -397,28 +395,28 @@ export const CrapsTable = () => {
         )}
       </AnimatePresence>
 
-      {/* Main Craps Table Layout */}
-      <div className="w-full max-w-7xl bg-gradient-to-br from-casino-green-dark via-casino-green to-casino-green-light bg-felt-texture border-4 sm:border-8 border-casino-gold shadow-glow-gold-lg rounded-2xl sm:rounded-3xl p-3 sm:p-8 relative box-border overflow-hidden">
+      {/* Main Craps Table Layout - 3 cols mobile, 7 cols desktop */}
+      <div className="w-full max-w-7xl bg-gradient-to-br from-casino-green-dark via-casino-green to-casino-green-light bg-felt-texture border-2 sm:border-8 border-casino-gold shadow-glow-gold-lg rounded-xl sm:rounded-3xl p-2 sm:p-8 relative box-border overflow-hidden">
 
-        {/* Top: Number Boxes (4, 5, SIX, 8, NINE, 10) + Don't Come Bar */}
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-3 mb-4 sm:mb-6">
-          <NumberBox number={4} />
-          <NumberBox number={5} />
-          <NumberBox number={6} displayText="SIX" />
-          <NumberBox number={8} />
-          <NumberBox number={9} displayText="NINE" />
-          <NumberBox number={10} />
+        {/* Number Boxes */}
+        <div className="grid grid-cols-3 sm:grid-cols-7 gap-1 sm:gap-3 mb-2 sm:mb-6">
+          <NumberBox number={4} gameState={gameState} handlePlaceBet={handlePlaceBet} handleRemoveBet={handleRemoveBet} {...betAreaProps} />
+          <NumberBox number={5} gameState={gameState} handlePlaceBet={handlePlaceBet} handleRemoveBet={handleRemoveBet} {...betAreaProps} />
+          <NumberBox number={6} displayText="SIX" gameState={gameState} handlePlaceBet={handlePlaceBet} handleRemoveBet={handleRemoveBet} {...betAreaProps} />
+          <NumberBox number={8} gameState={gameState} handlePlaceBet={handlePlaceBet} handleRemoveBet={handleRemoveBet} {...betAreaProps} />
+          <NumberBox number={9} displayText="NINE" gameState={gameState} handlePlaceBet={handlePlaceBet} handleRemoveBet={handleRemoveBet} {...betAreaProps} />
+          <NumberBox number={10} gameState={gameState} handlePlaceBet={handlePlaceBet} handleRemoveBet={handleRemoveBet} {...betAreaProps} />
 
           {/* Don't Come Bar */}
-          <div className="flex flex-col gap-1">
-            <div className="h-6 sm:h-8"></div>
+          <div className="flex flex-col gap-0.5 sm:gap-1 col-span-3 sm:col-span-1">
+            <div className="h-5 sm:h-8 hidden sm:block"></div>
             <BetArea
               label={
-                <div className="flex flex-col items-center">
-                  <div className="text-[0.6rem] sm:text-xs">DON'T</div>
-                  <div className="text-sm sm:text-lg font-bold">COME</div>
-                  <div className="text-[0.6rem] sm:text-xs">BAR</div>
-                  <div className="text-lg sm:text-2xl">⚅⚅</div>
+                <div className="flex flex-row sm:flex-col items-center gap-1 sm:gap-0">
+                  <span className="text-[0.5rem] sm:text-xs">DON'T</span>
+                  <span className="text-sm sm:text-lg font-bold">COME</span>
+                  <span className="text-[0.5rem] sm:text-xs">BAR</span>
+                  <span className="text-base sm:text-2xl">⚅⚅</span>
                 </div>
               }
               betType="dontCome"
@@ -426,35 +424,31 @@ export const CrapsTable = () => {
               onClick={() => handlePlaceBet('dontCome')}
               onRemove={() => handleRemoveBet('dontCome')}
               disabled={gameState?.phase === 'comeOut'}
-              className="min-h-[80px] sm:min-h-[120px] bg-black bg-opacity-20 text-white"
+              className="min-h-[45px] sm:min-h-[120px] bg-black bg-opacity-20 text-white"
+              {...betAreaProps}
             />
-            <div className="h-8 sm:h-[52px]"></div>
+            <div className="hidden sm:block h-[52px]"></div>
           </div>
         </div>
 
-        {/* Middle: Come Area + Field */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-3 sm:mb-4">
-          {/* COME Box */}
+        {/* Come Area + Field */}
+        <div className="grid grid-cols-2 gap-1 sm:gap-4 mb-1.5 sm:mb-4">
           <BetArea
-            label={<div className="text-2xl sm:text-4xl text-red-500 font-black">COME</div>}
+            label={<div className="text-lg sm:text-4xl text-red-500 font-black">COME</div>}
             betType="come"
             amount={gameState?.bets?.come || 0}
             onClick={() => handlePlaceBet('come')}
             onRemove={() => handleRemoveBet('come')}
             disabled={gameState?.phase === 'comeOut'}
-            className="h-24 sm:h-32 bg-casino-green-dark"
+            className="h-14 sm:h-32 bg-casino-green-dark"
+            {...betAreaProps}
           />
-
-          {/* FIELD Box */}
           <BetArea
             label={
-              <div className="flex flex-col items-center gap-0.5 sm:gap-1">
-                <div className="text-[0.65rem] sm:text-sm text-gray-300">PAYS DOUBLE</div>
-                <div className="text-xs sm:text-xl">
-                  <span>2•3•4•9•10•11•12</span>
-                </div>
-                <div className="text-xl sm:text-3xl font-black">FIELD</div>
-                <div className="text-[0.65rem] sm:text-sm text-gray-300 hidden sm:block">PAYS DOUBLE</div>
+              <div className="flex flex-col items-center">
+                <div className="text-[0.5rem] sm:text-sm text-gray-300">PAYS DOUBLE</div>
+                <div className="text-[0.5rem] sm:text-xl">2·3·4·9·10·11·12</div>
+                <div className="text-base sm:text-3xl font-black">FIELD</div>
               </div>
             }
             betType="field"
@@ -462,16 +456,17 @@ export const CrapsTable = () => {
             onClick={() => handlePlaceBet('field')}
             onRemove={() => handleRemoveBet('field')}
             disabled={false}
-            className="h-24 sm:h-32 bg-casino-green text-white"
+            className="h-14 sm:h-32 bg-casino-green text-white"
+            {...betAreaProps}
           />
         </div>
 
-        {/* Don't Pass Bar */}
+        {/* Don't Pass */}
         <BetArea
           label={
-            <div className="flex items-center justify-between px-2 sm:px-8">
-              <span className="text-lg sm:text-3xl font-black">DON'T PASS BAR</span>
-              <span className="text-2xl sm:text-4xl">⚅⚅</span>
+            <div className="flex items-center justify-between px-2 sm:px-8 gap-2">
+              <span className="text-xs sm:text-3xl font-black">DON'T PASS BAR</span>
+              <span className="text-lg sm:text-4xl">⚅⚅</span>
             </div>
           }
           betType="dontPass"
@@ -479,99 +474,83 @@ export const CrapsTable = () => {
           onClick={() => handlePlaceBet('dontPass')}
           onRemove={() => handleRemoveBet('dontPass')}
           disabled={gameState?.phase !== 'comeOut'}
-          className="h-14 sm:h-20 mb-2 sm:mb-3 bg-black bg-opacity-30 text-white"
-          tooltip={gameState?.phase !== 'comeOut' ? 'Only available on Come Out Roll' : 'Don\'t Pass Bar - wins on 2, 3; push on 12; loses on 7, 11'}
+          className="h-10 sm:h-20 mb-1 sm:mb-3 bg-black bg-opacity-30 text-white"
+          tooltip={gameState?.phase !== 'comeOut' ? 'Only available on Come Out Roll' : 'Don\'t Pass Bar'}
+          {...betAreaProps}
         />
 
         {/* Pass Line */}
         <BetArea
-          label={<span className="text-2xl sm:text-4xl font-black text-blue-300">PASS LINE</span>}
+          label={<span className="text-lg sm:text-4xl font-black text-blue-300">PASS LINE</span>}
           betType="passLine"
           amount={gameState?.bets?.passLine || 0}
           onClick={() => handlePlaceBet('passLine')}
           onRemove={() => handleRemoveBet('passLine')}
           disabled={gameState?.phase !== 'comeOut'}
-          className="h-16 sm:h-24 bg-casino-green-dark border-2 sm:border-4"
-          tooltip={gameState?.phase !== 'comeOut' ? 'Only available on Come Out Roll' : 'Pass Line - wins on 7, 11; loses on 2, 3, 12'}
+          className="h-12 sm:h-24 bg-casino-green-dark border-2 sm:border-4"
+          tooltip={gameState?.phase !== 'comeOut' ? 'Only available on Come Out Roll' : 'Pass Line'}
+          {...betAreaProps}
         />
 
-        {/* Proposition Bets Section */}
-        <div className="mt-3 sm:mt-4 bg-black bg-opacity-30 p-2 sm:p-4 rounded-lg border-2 border-casino-gold">
-          <div className="grid grid-cols-2 gap-2 sm:gap-4">
-            {/* Hardways */}
-            <div className="bg-black bg-opacity-50 p-2 sm:p-3 rounded-lg">
-              <div className="text-casino-gold text-[0.65rem] sm:text-xs font-bold mb-1 sm:mb-2 text-center">HARDWAYS</div>
-              <div className="grid grid-cols-2 gap-1 sm:gap-2">
-                <BetArea
-                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HARD<br/>4<br/>7:1</div>}
-                  betType="hardway"
-                  amount={gameState?.bets?.hardways?.[4] || 0}
-                  onClick={() => handlePlaceBet('hardway', 4)}
-                  onRemove={() => handleRemoveBet('hardway', 4)}
-                  className="h-12 sm:h-16 bg-casino-green-dark"
-                />
-                <BetArea
-                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HARD<br/>6<br/>9:1</div>}
-                  betType="hardway"
-                  amount={gameState?.bets?.hardways?.[6] || 0}
-                  onClick={() => handlePlaceBet('hardway', 6)}
-                  onRemove={() => handleRemoveBet('hardway', 6)}
-                  className="h-12 sm:h-16 bg-casino-green-dark"
-                />
-                <BetArea
-                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HARD<br/>8<br/>9:1</div>}
-                  betType="hardway"
-                  amount={gameState?.bets?.hardways?.[8] || 0}
-                  onClick={() => handlePlaceBet('hardway', 8)}
-                  onRemove={() => handleRemoveBet('hardway', 8)}
-                  className="h-12 sm:h-16 bg-casino-green-dark"
-                />
-                <BetArea
-                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HARD<br/>10<br/>7:1</div>}
-                  betType="hardway"
-                  amount={gameState?.bets?.hardways?.[10] || 0}
-                  onClick={() => handlePlaceBet('hardway', 10)}
-                  onRemove={() => handleRemoveBet('hardway', 10)}
-                  className="h-12 sm:h-16 bg-casino-green-dark"
-                />
+        {/* Proposition Bets */}
+        <div className="mt-1.5 sm:mt-4 bg-black bg-opacity-30 p-1.5 sm:p-4 rounded-lg border-2 border-casino-gold">
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-4">
+            <div className="bg-black bg-opacity-50 p-1 sm:p-3 rounded-lg">
+              <div className="text-casino-gold text-[0.5rem] sm:text-xs font-bold mb-0.5 sm:mb-2 text-center">HARDWAYS</div>
+              <div className="grid grid-cols-2 gap-0.5 sm:gap-2">
+                {[4, 6, 8, 10].map(num => (
+                  <BetArea
+                    key={num}
+                    label={<div className="text-[0.45rem] sm:text-xs leading-tight">HARD<br/>{num}<br/>{num === 4 || num === 10 ? '7:1' : '9:1'}</div>}
+                    betType="hardway"
+                    amount={gameState?.bets?.hardways?.[num] || 0}
+                    onClick={() => handlePlaceBet('hardway', num)}
+                    onRemove={() => handleRemoveBet('hardway', num)}
+                    className="h-9 sm:h-16 bg-casino-green-dark"
+                    {...betAreaProps}
+                  />
+                ))}
               </div>
             </div>
 
-            {/* One Roll Bets */}
-            <div className="bg-black bg-opacity-50 p-2 sm:p-3 rounded-lg">
-              <div className="text-casino-gold text-[0.65rem] sm:text-xs font-bold mb-1 sm:mb-2 text-center">ONE ROLL BETS</div>
-              <div className="grid grid-cols-2 gap-1 sm:gap-2">
+            <div className="bg-black bg-opacity-50 p-1 sm:p-3 rounded-lg">
+              <div className="text-casino-gold text-[0.5rem] sm:text-xs font-bold mb-0.5 sm:mb-2 text-center">ONE ROLL BETS</div>
+              <div className="grid grid-cols-2 gap-0.5 sm:gap-2">
                 <BetArea
-                  label={<div className="text-[0.6rem] sm:text-xs text-red-500 leading-tight">ANY<br/>SEVEN<br/>4:1</div>}
+                  label={<div className="text-[0.45rem] sm:text-xs text-red-500 leading-tight">ANY<br/>SEVEN<br/>4:1</div>}
                   betType="anySeven"
                   amount={gameState?.bets?.anySeven || 0}
                   onClick={() => handlePlaceBet('anySeven')}
                   onRemove={() => handleRemoveBet('anySeven')}
-                  className="h-12 sm:h-16 bg-casino-green-dark"
+                  className="h-9 sm:h-16 bg-casino-green-dark"
+                  {...betAreaProps}
                 />
                 <BetArea
-                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">ANY<br/>CRAPS<br/>7:1</div>}
+                  label={<div className="text-[0.45rem] sm:text-xs leading-tight">ANY<br/>CRAPS<br/>7:1</div>}
                   betType="anyCraps"
                   amount={gameState?.bets?.anyCraps || 0}
                   onClick={() => handlePlaceBet('anyCraps')}
                   onRemove={() => handleRemoveBet('anyCraps')}
-                  className="h-12 sm:h-16 bg-casino-green-dark"
+                  className="h-9 sm:h-16 bg-casino-green-dark"
+                  {...betAreaProps}
                 />
                 <BetArea
-                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HORN<br/>2<br/>30:1</div>}
+                  label={<div className="text-[0.45rem] sm:text-xs leading-tight">HORN<br/>2<br/>30:1</div>}
                   betType="horn"
                   amount={gameState?.bets?.horn?.[2] || 0}
                   onClick={() => handlePlaceBet('horn', 2)}
                   onRemove={() => handleRemoveBet('horn', 2)}
-                  className="h-12 sm:h-16 bg-casino-green-dark"
+                  className="h-9 sm:h-16 bg-casino-green-dark"
+                  {...betAreaProps}
                 />
                 <BetArea
-                  label={<div className="text-[0.6rem] sm:text-xs leading-tight">HORN<br/>12<br/>30:1</div>}
+                  label={<div className="text-[0.45rem] sm:text-xs leading-tight">HORN<br/>12<br/>30:1</div>}
                   betType="horn"
                   amount={gameState?.bets?.horn?.[12] || 0}
                   onClick={() => handlePlaceBet('horn', 12)}
                   onRemove={() => handleRemoveBet('horn', 12)}
-                  className="h-12 sm:h-16 bg-casino-green-dark"
+                  className="h-9 sm:h-16 bg-casino-green-dark"
+                  {...betAreaProps}
                 />
               </div>
             </div>
@@ -579,10 +558,10 @@ export const CrapsTable = () => {
         </div>
       </div>
 
-      <div className="text-casino-gold text-sm text-center max-w-2xl">
-        <p>Left click to place bet • Right click to remove bet</p>
-        <p className="text-xs mt-2 text-gray-400">
-          Pass/Don't Pass only on Come Out • Come bets travel to numbers
+      <div className="text-casino-gold text-xs sm:text-sm text-center max-w-2xl px-2">
+        <p>Tap to place bet · Tap <span className="inline-flex items-center justify-center w-4 h-4 bg-red-600 rounded-full text-white text-[0.5rem]">X</span> to remove</p>
+        <p className="text-[0.55rem] sm:text-xs mt-1 text-gray-400">
+          Pass/Don't Pass only on Come Out · Come bets travel to numbers
         </p>
       </div>
     </div>

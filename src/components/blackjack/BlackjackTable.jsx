@@ -10,10 +10,9 @@ export const BlackjackTable = () => {
   const [betAmount, setBetAmount] = useState(0);
   const [selectedChip, setSelectedChip] = useState(10);
   const [showDealerHole, setShowDealerHole] = useState(false);
-  const [doubleDownFaceDown, setDoubleDownFaceDown] = useState(true); // Toggle for face-down double down
+  const [doubleDownFaceDown, setDoubleDownFaceDown] = useState(true);
   const { gameState, isInitialized, startHand, hit, stand, doubleDown, split } = useBlackjack();
 
-  // Delay showing dealer's hole card by 1.5 seconds when game finishes
   useEffect(() => {
     if (gameState?.gameState === 'finished') {
       setShowDealerHole(false);
@@ -30,7 +29,6 @@ export const BlackjackTable = () => {
     if (betAmount > 0) {
       await startHand(betAmount);
       setShowDealerHole(false);
-      // Haptic feedback
       if (navigator.vibrate) {
         navigator.vibrate([50, 30, 50]);
       }
@@ -39,7 +37,6 @@ export const BlackjackTable = () => {
 
   const handlePlaceBet = () => {
     setBetAmount(prev => prev + selectedChip);
-    // Haptic feedback
     if (navigator.vibrate) {
       navigator.vibrate(30);
     }
@@ -49,10 +46,16 @@ export const BlackjackTable = () => {
     setBetAmount(0);
   };
 
+  // Fix 5.7: Undo last chip added
+  const handleUndoLastChip = () => {
+    setBetAmount(prev => Math.max(0, prev - selectedChip));
+  };
+
   const handleDoubleDown = () => {
     doubleDown(doubleDownFaceDown);
   };
 
+  // Fix 5.1: Hand value calculation (also used for display)
   const getHandValue = (hand, showSoft = false) => {
     if (!hand) return showSoft ? { soft: 0, hard: 0, display: '0' } : 0;
 
@@ -60,6 +63,7 @@ export const BlackjackTable = () => {
     let aces = 0;
 
     for (const card of hand) {
+      if (card.faceDown) continue; // Don't count hidden cards
       if (card.rank === 'A') {
         aces++;
         value += 11;
@@ -70,18 +74,16 @@ export const BlackjackTable = () => {
       }
     }
 
-    const hardValue = value - (aces * 10); // All aces count as 1
+    const hardValue = value - (aces * 10);
     let softValue = value;
 
-    // Adjust aces to prevent bust
     while (softValue > 21 && aces > 0) {
       softValue -= 10;
       aces--;
     }
 
     if (showSoft) {
-      // Check if hand has usable ace (soft hand)
-      const hasUsableAce = hand.some(c => c.rank === 'A') && softValue !== hardValue && softValue <= 21;
+      const hasUsableAce = hand.some(c => !c.faceDown && c.rank === 'A') && softValue !== hardValue && softValue <= 21;
 
       if (hasUsableAce) {
         return {
@@ -110,14 +112,14 @@ export const BlackjackTable = () => {
   }
 
   return (
-    <div className="flex flex-col items-center gap-8 p-8 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[600px] rounded-2xl shadow-felt-depth">
+    <div className="flex flex-col items-center gap-4 sm:gap-8 p-4 sm:p-8 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[500px] sm:min-h-[600px] rounded-2xl shadow-felt-depth">
       {/* Win Celebration */}
       <WinCelebration
         show={gameState?.result && showDealerHole && (gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack')}
       />
 
       {/* Dealer's Hand */}
-      <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-col items-center gap-2 sm:gap-4">
         {gameState?.dealerHand && gameState.dealerHand.length > 0 && (
           <>
             <Hand
@@ -126,6 +128,13 @@ export const BlackjackTable = () => {
               label="Dealer"
               dealDelay={0.5}
             />
+            {/* Fix 5.1: Show dealer hand value */}
+            <div className="text-white text-sm sm:text-lg font-bold bg-black/40 px-3 py-1 rounded-lg">
+              {showDealerHole || gameState.gameState === 'betting'
+                ? getHandValue(gameState.dealerHand, true).display || getHandValue(gameState.dealerHand)
+                : '?'
+              }
+            </div>
           </>
         )}
       </div>
@@ -137,7 +146,7 @@ export const BlackjackTable = () => {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.5 }}
           className={`
-            px-8 py-4 rounded-xl border-4 backdrop-blur-lg
+            px-4 sm:px-8 py-3 sm:py-4 rounded-xl border-4 backdrop-blur-lg
             ${gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack'
               ? 'bg-gradient-to-br from-green-600/80 to-green-800/80 border-green-400 shadow-glow-green'
               : gameState.result.outcome === 'push'
@@ -146,13 +155,13 @@ export const BlackjackTable = () => {
           `}
         >
           <div className="text-center">
-            <div className={`text-3xl font-black mb-2 drop-shadow-lg ${
+            <div className={`text-xl sm:text-3xl font-black mb-1 sm:mb-2 drop-shadow-lg ${
               gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack'
               ? 'text-green-100' : gameState.result.outcome === 'push' ? 'text-casino-gold' : 'text-red-100'
             }`}>
               {gameState.result.outcome.toUpperCase()}
             </div>
-            <div className="text-white text-xl font-semibold">
+            <div className="text-white text-base sm:text-xl font-semibold">
               {gameState.result.payout > 0 && `Won $${gameState.result.payout}`}
               {gameState.result.payout === 0 && gameState.result.outcome !== 'push' && 'Lost'}
               {gameState.result.outcome === 'push' && 'Push - Bet Returned'}
@@ -162,17 +171,24 @@ export const BlackjackTable = () => {
       )}
 
       {/* Player's Hands */}
-      <div className="flex gap-8">
+      <div className="flex gap-4 sm:gap-8 flex-wrap justify-center">
         {gameState?.playerHands?.map((hand, index) => {
+          const handVal = getHandValue(hand, true);
           return (
-            <div key={index} className="flex flex-col items-center gap-4">
+            <div key={index} className="flex flex-col items-center gap-2 sm:gap-4">
               <Hand
                 cards={hand}
                 label={`Player${gameState.playerHands.length > 1 ? ` ${index + 1}` : ''}`}
                 dealDelay={0}
               />
+              {/* Fix 5.1: Show player hand value */}
+              {hand.length > 0 && (
+                <div className="text-white text-sm sm:text-lg font-bold bg-black/40 px-3 py-1 rounded-lg">
+                  {handVal.display || handVal}
+                </div>
+              )}
               {gameState.currentHandIndex === index && gameState.gameState === 'player-turn' && (
-                <div className="text-casino-gold animate-pulse">← Active</div>
+                <div className="text-casino-gold animate-pulse text-sm">← Active</div>
               )}
             </div>
           );
@@ -184,11 +200,11 @@ export const BlackjackTable = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col items-center gap-4 w-full max-w-2xl"
+          className="flex flex-col items-center gap-3 sm:gap-4 w-full max-w-2xl"
         >
           <div className="text-center">
-            <div className="text-casino-gold text-lg mb-2">Current Bet</div>
-            <div className="text-white text-3xl font-bold">${betAmount}</div>
+            <div className="text-casino-gold text-base sm:text-lg mb-1 sm:mb-2">Current Bet</div>
+            <div className="text-white text-2xl sm:text-3xl font-bold">${betAmount}</div>
           </div>
 
           <ChipSelector
@@ -196,19 +212,24 @@ export const BlackjackTable = () => {
             selectedChip={selectedChip}
           />
 
-          <div className="flex gap-4">
+          <div className="flex gap-2 sm:gap-4 flex-wrap justify-center">
             <Button onClick={handlePlaceBet} variant="secondary">
               Add ${selectedChip}
             </Button>
-            <Button onClick={handleClearBet} variant="danger">
-              Clear Bet
+            {/* Fix 5.7: Undo last chip */}
+            <Button onClick={handleUndoLastChip} variant="ghost" disabled={betAmount === 0}>
+              Undo
             </Button>
+            <Button onClick={handleClearBet} variant="danger" disabled={betAmount === 0}>
+              Clear
+            </Button>
+            {/* Fix 5.2: Rebet & Deal button */}
             <Button
               onClick={handleStartHand}
               disabled={betAmount === 0}
               variant="primary"
             >
-              Deal Cards
+              {gameState?.gameState === 'finished' ? 'Rebet & Deal' : 'Deal Cards'}
             </Button>
           </div>
         </motion.div>
@@ -219,9 +240,9 @@ export const BlackjackTable = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col gap-4 items-center"
+          className="flex flex-col gap-3 sm:gap-4 items-center"
         >
-          <div className="flex gap-4">
+          <div className="flex gap-2 sm:gap-4 flex-wrap justify-center">
             <Button onClick={hit} variant="primary">
               Hit
             </Button>
@@ -230,7 +251,7 @@ export const BlackjackTable = () => {
             </Button>
             {gameState.canDoubleDown && (
               <Button onClick={handleDoubleDown} variant="ghost">
-                Double Down {doubleDownFaceDown ? '(Face Down)' : '(Face Up)'}
+                Double{doubleDownFaceDown ? ' (Down)' : ' (Up)'}
               </Button>
             )}
             {gameState.canSplit && (
@@ -240,9 +261,8 @@ export const BlackjackTable = () => {
             )}
           </div>
 
-          {/* Double Down Card Option */}
           {gameState.canDoubleDown && (
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-xs sm:text-sm">
               <label className="text-casino-gold cursor-pointer flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -250,7 +270,7 @@ export const BlackjackTable = () => {
                   onChange={(e) => setDoubleDownFaceDown(e.target.checked)}
                   className="w-4 h-4 cursor-pointer"
                 />
-                <span>Deal double down card face down (traditional)</span>
+                <span>Deal double down card face down</span>
               </label>
             </div>
           )}
@@ -259,8 +279,8 @@ export const BlackjackTable = () => {
 
       {/* Shoe Info */}
       {gameState && (
-        <div className="text-casino-gold text-sm opacity-50">
-          Cards remaining in shoe: {gameState.shoeSize}
+        <div className="text-casino-gold text-xs sm:text-sm opacity-50">
+          Cards remaining: {gameState.shoeSize}
         </div>
       )}
     </div>

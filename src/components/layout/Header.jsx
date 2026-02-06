@@ -7,16 +7,16 @@ export const Header = ({ onOpenSettings, onOpenInfo }) => {
     <motion.header
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      className="bg-charcoal border-b-2 border-casino-gold px-8 py-4"
+      className="bg-charcoal border-b-2 border-casino-gold px-4 sm:px-8 py-3 sm:py-4"
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-casino-gold to-yellow-500 bg-clip-text text-transparent">
+          <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-casino-gold to-yellow-500 bg-clip-text text-transparent">
             Premium Vegas Casino
           </h1>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2 sm:gap-6">
           <WalletDisplay />
 
           <button
@@ -24,7 +24,7 @@ export const Header = ({ onOpenSettings, onOpenInfo }) => {
             className="p-2 hover:bg-charcoal-light rounded-lg transition-colors"
             title="Provably Fair Info"
           >
-            <Info className="text-casino-gold" size={24} />
+            <Info className="text-casino-gold" size={20} />
           </button>
 
           <button
@@ -32,7 +32,7 @@ export const Header = ({ onOpenSettings, onOpenInfo }) => {
             className="p-2 hover:bg-charcoal-light rounded-lg transition-colors"
             title="Settings"
           >
-            <Settings className="text-casino-gold" size={24} />
+            <Settings className="text-casino-gold" size={20} />
           </button>
         </div>
       </div>

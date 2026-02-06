@@ -17,18 +17,18 @@ export const Chip = ({ value, onClick, selected = false, className = '' }) => {
       whileTap={{ scale: 0.9 }}
       onClick={onClick}
       className={`
-        relative w-16 h-16 rounded-full
-        border-4 ${getChipColor(value)}
+        relative w-11 h-11 sm:w-16 sm:h-16 rounded-full
+        border-2 sm:border-4 ${getChipColor(value)}
         flex items-center justify-center
         font-bold text-white shadow-lg
         cursor-pointer
-        ${selected ? 'ring-4 ring-casino-gold' : ''}
+        ${selected ? 'ring-2 sm:ring-4 ring-casino-gold' : ''}
         ${className}
       `}
     >
-      <div className="absolute inset-0 rounded-full border-4 border-white opacity-20" />
-      <div className="absolute inset-2 rounded-full border-2 border-white opacity-30" />
-      <span className="relative z-10 text-sm">${value}</span>
+      <div className="absolute inset-0 rounded-full border-2 sm:border-4 border-white opacity-20" />
+      <div className="absolute inset-1 sm:inset-2 rounded-full border sm:border-2 border-white opacity-30" />
+      <span className="relative z-10 text-[0.6rem] sm:text-sm">${value}</span>
     </motion.button>
   );
 };
@@ -37,7 +37,7 @@ export const ChipSelector = ({ onSelectChip, selectedChip }) => {
   const chipValues = [5, 10, 25, 100, 500, 1000];
 
   return (
-    <div className="flex gap-4 justify-center items-center p-4 bg-charcoal-dark rounded-lg">
+    <div className="flex gap-2 sm:gap-4 justify-center items-center p-2 sm:p-4 bg-charcoal-dark rounded-lg flex-wrap">
       {chipValues.map(value => (
         <Chip
           key={value}

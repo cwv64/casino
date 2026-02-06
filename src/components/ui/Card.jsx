@@ -26,7 +26,7 @@ export const Card = ({ rank, suit, faceDown = false, index = 0, dealDelay = 0 })
         stiffness: 100,
         damping: 15
       }}
-      className="relative w-20 h-28 select-none"
+      className="relative w-14 h-20 sm:w-20 sm:h-28 select-none flex-shrink-0"
       style={{ transformStyle: 'preserve-3d' }}
     >
       {/* Front of card */}
@@ -39,10 +39,10 @@ export const Card = ({ rank, suit, faceDown = false, index = 0, dealDelay = 0 })
         `}
         style={{ backfaceVisibility: 'hidden' }}
       >
-        <div className={`text-3xl font-bold ${getSuitColor(suit)}`}>
+        <div className={`text-xl sm:text-3xl font-bold ${getSuitColor(suit)}`}>
           {rank}
         </div>
-        <div className={`text-4xl ${getSuitColor(suit)}`}>
+        <div className={`text-2xl sm:text-4xl ${getSuitColor(suit)}`}>
           {getSuitSymbol(suit)}
         </div>
       </div>
@@ -61,7 +61,7 @@ export const Card = ({ rank, suit, faceDown = false, index = 0, dealDelay = 0 })
           transform: 'rotateY(180deg)'
         }}
       >
-        <div className="w-16 h-24 border-4 border-casino-gold rounded-md opacity-50" />
+        <div className="w-10 h-16 sm:w-16 sm:h-24 border-2 sm:border-4 border-casino-gold rounded-md opacity-50" />
       </div>
     </motion.div>
   );
@@ -71,9 +71,9 @@ export const Hand = ({ cards, faceDownFirst = false, label = '', dealDelay = 0, 
   return (
     <div className="flex flex-col items-center gap-2">
       {label && (
-        <span className="text-casino-gold font-semibold">{label}</span>
+        <span className="text-casino-gold font-semibold text-sm sm:text-base">{label}</span>
       )}
-      <div className="flex gap-2">
+      <div className="flex gap-1 sm:gap-2 flex-wrap justify-center">
         {cards.map((card, index) => (
           <Card
             key={`${card.rank}-${card.suit}-${index}`}
