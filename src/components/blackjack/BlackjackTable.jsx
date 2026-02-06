@@ -1,12 +1,48 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBlackjack } from '../../hooks/useBlackjack';
 import { useWalletStore } from '../../stores/walletStore';
 import { Hand } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { ChipSelector } from '../ui/Chip';
+import { ChipSelector, Chip } from '../ui/Chip';
 import { WinCelebration } from '../ui/WinCelebration';
+import { DealerChat } from '../ui/DealerChat';
 import { sounds } from '../../utils/sounds';
+
+// 3.2: Chip stack visual for bet display
+const ChipStack = ({ amount }) => {
+  if (amount <= 0) return null;
+
+  const denominations = [1000, 500, 100, 25, 10, 5];
+  const chips = [];
+  let remaining = amount;
+  for (const d of denominations) {
+    while (remaining >= d && chips.length < 8) {
+      chips.push(d);
+      remaining -= d;
+    }
+  }
+
+  return (
+    <div className="flex flex-col-reverse items-center relative h-16 sm:h-20">
+      {chips.map((chipVal, i) => (
+        <motion.div
+          key={i}
+          initial={{ y: -30, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: i * 0.08, type: 'spring', stiffness: 300, damping: 15 }}
+          className="absolute"
+          style={{ bottom: i * 4 }}
+        >
+          <Chip value={chipVal} className="w-9 h-9 sm:w-12 sm:h-12 text-[0.5rem] sm:text-xs pointer-events-none shadow-md" />
+        </motion.div>
+      ))}
+      <div className="absolute -bottom-5 text-casino-gold text-xs sm:text-sm font-bold">
+        ${amount}
+      </div>
+    </div>
+  );
+};
 
 export const BlackjackTable = () => {
   const [betAmount, setBetAmount] = useState(0);
@@ -15,13 +51,33 @@ export const BlackjackTable = () => {
   const [doubleDownFaceDown, setDoubleDownFaceDown] = useState(true);
   const [betError, setBetError] = useState(null);
   const [showHandValues, setShowHandValues] = useState(false);
+  const [dealerEvent, setDealerEvent] = useState(null);
   const { gameState, isInitialized, startHand, hit, stand, doubleDown, split } = useBlackjack();
   const { balance } = useWalletStore();
+
+  // 3.1: Determine hand status for visual indicators
+  const handStatuses = useMemo(() => {
+    if (!gameState?.playerHands || !gameState.result) return [];
+    return gameState.playerHands.map((hand, i) => {
+      if (!gameState.result?.handResults) {
+        if (gameState.result.outcome === 'bust') return 'bust';
+        if (gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack') return 'win';
+        if (gameState.result.outcome === 'lose') return 'lose';
+        if (gameState.result.outcome === 'push') return 'push';
+      } else {
+        const hr = gameState.result.handResults[i];
+        if (hr?.outcome === 'bust') return 'bust';
+        if (hr?.outcome === 'win') return 'win';
+        if (hr?.outcome === 'lose') return 'lose';
+        if (hr?.outcome === 'push') return 'push';
+      }
+      return null;
+    });
+  }, [gameState?.result]);
 
   // Delay showing hand values until card deal animations complete
   useEffect(() => {
     if (gameState?.gameState === 'player-turn') {
-      // Initial deal: 4 cards animate in over ~2s
       if (!showHandValues) {
         const timer = setTimeout(() => setShowHandValues(true), 1800);
         return () => clearTimeout(timer);
@@ -41,20 +97,31 @@ export const BlackjackTable = () => {
     }
   }, [gameState?.playerHands?.reduce((n, h) => n + h.length, 0)]);
 
+  // 3.3: Trigger dealer chat on game events + play result sounds
   useEffect(() => {
     if (gameState?.gameState === 'finished') {
       setShowDealerHole(false);
-      setShowHandValues(true); // Show final values immediately
+      setShowHandValues(true);
       const timer = setTimeout(() => {
         setShowDealerHole(true);
-        // Fix 5.4: Play result sound
         if (gameState.result) {
-          if (gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack') {
+          const outcome = gameState.result.outcome;
+          if (outcome === 'blackjack') {
+            setDealerEvent('playerBlackjack');
             if (gameState.result.payout >= 100) sounds.bigWin();
             else sounds.win();
-          } else if (gameState.result.outcome === 'push') {
+          } else if (outcome === 'win') {
+            setDealerEvent(gameState.result.payout >= 200 ? 'bigWin' : 'win');
+            if (gameState.result.payout >= 100) sounds.bigWin();
+            else sounds.win();
+          } else if (outcome === 'push') {
+            setDealerEvent('push');
             sounds.push();
+          } else if (outcome === 'bust') {
+            setDealerEvent('bust');
+            sounds.lose();
           } else {
+            setDealerEvent('lose');
             sounds.lose();
           }
         }
@@ -67,24 +134,21 @@ export const BlackjackTable = () => {
 
   const handleStartHand = async () => {
     if (betAmount > 0) {
-      // Fix 5.5: Validate balance before dealing
       if (betAmount > balance) {
         setBetError(`Insufficient funds! Balance: $${balance.toLocaleString()}`);
         sounds.error();
         setTimeout(() => setBetError(null), 2500);
         return;
       }
+      setDealerEvent('deal');
       await startHand(betAmount);
       sounds.cardDeal();
       setShowDealerHole(false);
-      if (navigator.vibrate) {
-        navigator.vibrate([50, 30, 50]);
-      }
+      if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
     }
   };
 
   const handlePlaceBet = () => {
-    // Fix 5.5: Validate balance before adding chip
     if (betAmount + selectedChip > balance) {
       setBetError(`Can't exceed balance ($${balance.toLocaleString()})`);
       sounds.error();
@@ -93,9 +157,7 @@ export const BlackjackTable = () => {
     }
     setBetAmount(prev => prev + selectedChip);
     sounds.chipPlace();
-    if (navigator.vibrate) {
-      navigator.vibrate(30);
-    }
+    if (navigator.vibrate) navigator.vibrate(30);
   };
 
   const handleClearBet = () => {
@@ -103,18 +165,35 @@ export const BlackjackTable = () => {
     sounds.chipRemove();
   };
 
-  // Fix 5.7: Undo last chip added
   const handleUndoLastChip = () => {
     setBetAmount(prev => Math.max(0, prev - selectedChip));
     sounds.chipRemove();
   };
 
   const handleDoubleDown = () => {
+    setDealerEvent('doubleDown');
     doubleDown(doubleDownFaceDown);
     sounds.cardDeal();
   };
 
-  // Fix 5.1: Hand value calculation (also used for display)
+  const handleHit = () => {
+    hit();
+    sounds.cardDeal();
+  };
+
+  const handleStand = () => {
+    setDealerEvent('stand');
+    stand();
+    sounds.buttonClick?.() || sounds.chipPlace();
+  };
+
+  const handleSplit = () => {
+    setDealerEvent('split');
+    split();
+    sounds.cardDeal();
+  };
+
+  // Hand value calculation (also used for display)
   const getHandValue = (hand, showSoft = false) => {
     if (!hand) return showSoft ? { soft: 0, hard: 0, display: '0' } : 0;
 
@@ -122,7 +201,7 @@ export const BlackjackTable = () => {
     let aces = 0;
 
     for (const card of hand) {
-      if (card.faceDown) continue; // Don't count hidden cards
+      if (card.faceDown) continue;
       if (card.rank === 'A') {
         aces++;
         value += 11;
@@ -143,20 +222,10 @@ export const BlackjackTable = () => {
 
     if (showSoft) {
       const hasUsableAce = hand.some(c => !c.faceDown && c.rank === 'A') && softValue !== hardValue && softValue <= 21;
-
       if (hasUsableAce) {
-        return {
-          soft: softValue,
-          hard: hardValue,
-          display: `${hardValue}/${softValue}`
-        };
-      } else {
-        return {
-          soft: softValue,
-          hard: softValue,
-          display: `${softValue}`
-        };
+        return { soft: softValue, hard: hardValue, display: `${hardValue}/${softValue}` };
       }
+      return { soft: softValue, hard: softValue, display: `${softValue}` };
     }
 
     return softValue;
@@ -171,15 +240,19 @@ export const BlackjackTable = () => {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 sm:gap-8 p-4 sm:p-8 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[500px] sm:min-h-[600px] rounded-2xl shadow-felt-depth">
-      {/* Fix 5.8: Win Celebration scaled with payout */}
+    <div className="relative flex flex-col items-center gap-4 sm:gap-8 p-4 sm:p-8 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[500px] sm:min-h-[600px] rounded-2xl shadow-felt-depth vignette">
       <WinCelebration
         show={gameState?.result && showDealerHole && (gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack')}
         payout={gameState?.result?.payout || 0}
       />
 
+      {/* 3.3: Dealer chat bubble */}
+      <div className="relative z-10">
+        <DealerChat game="blackjack" event={dealerEvent} />
+      </div>
+
       {/* Dealer's Hand */}
-      <div className="flex flex-col items-center gap-2 sm:gap-4">
+      <div className="flex flex-col items-center gap-2 sm:gap-4 relative z-10">
         {gameState?.dealerHand && gameState.dealerHand.length > 0 && (
           <>
             <Hand
@@ -188,7 +261,6 @@ export const BlackjackTable = () => {
               label="Dealer"
               dealDelay={0.5}
             />
-            {/* Fix 5.1: Show dealer hand value (only after deal animation) */}
             {showHandValues && (
               <div className="text-white text-sm sm:text-lg font-bold bg-black/40 px-3 py-1 rounded-lg">
                 {showDealerHole
@@ -208,7 +280,7 @@ export const BlackjackTable = () => {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.5 }}
           className={`
-            px-4 sm:px-8 py-3 sm:py-4 rounded-xl border-4 backdrop-blur-lg
+            relative z-10 px-4 sm:px-8 py-3 sm:py-4 rounded-xl border-4 backdrop-blur-lg
             ${gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack'
               ? 'bg-gradient-to-br from-green-600/80 to-green-800/80 border-green-400 shadow-glow-green'
               : gameState.result.outcome === 'push'
@@ -232,23 +304,47 @@ export const BlackjackTable = () => {
         </motion.div>
       )}
 
-      {/* Player's Hands */}
-      <div className="flex gap-4 sm:gap-8 flex-wrap justify-center">
+      {/* Player's Hands — with 3.1 bust/win indicators */}
+      <div className="flex gap-4 sm:gap-8 flex-wrap justify-center relative z-10">
         {gameState?.playerHands?.map((hand, index) => {
           const handVal = getHandValue(hand, true);
+          const status = showDealerHole ? handStatuses[index] : null;
+
           return (
-            <div key={index} className="flex flex-col items-center gap-2 sm:gap-4">
+            <div
+              key={index}
+              className={`
+                flex flex-col items-center gap-2 sm:gap-4 relative p-2 sm:p-3 rounded-xl transition-all duration-300
+                ${status === 'win' ? 'hand-win bg-green-500/10' : ''}
+                ${status === 'bust' ? 'hand-bust' : ''}
+                ${status === 'lose' ? 'bg-red-500/5' : ''}
+              `}
+            >
               <Hand
                 cards={hand}
                 label={`Player${gameState.playerHands.length > 1 ? ` ${index + 1}` : ''}`}
                 dealDelay={0}
               />
-              {/* Fix 5.1: Show player hand value (only after deal animation) */}
+
+              {/* 3.1: BUST stamp overlay */}
+              {status === 'bust' && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                  <div className="bust-stamp text-red-500 text-3xl sm:text-5xl font-black border-4 border-red-500 px-3 sm:px-5 py-1 sm:py-2 rounded-lg bg-red-500/10 backdrop-blur-sm">
+                    BUST
+                  </div>
+                </div>
+              )}
+
+              {/* Hand value display */}
               {hand.length > 0 && showHandValues && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-white text-sm sm:text-lg font-bold bg-black/40 px-3 py-1 rounded-lg"
+                  className={`text-sm sm:text-lg font-bold px-3 py-1 rounded-lg ${
+                    status === 'bust' ? 'bg-red-600/60 text-red-100' :
+                    status === 'win' ? 'bg-green-600/60 text-green-100' :
+                    'bg-black/40 text-white'
+                  }`}
                 >
                   {handVal.display || handVal}
                 </motion.div>
@@ -266,14 +362,18 @@ export const BlackjackTable = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col items-center gap-3 sm:gap-4 w-full max-w-2xl"
+          className="flex flex-col items-center gap-3 sm:gap-4 w-full max-w-2xl relative z-10"
         >
+          {/* 3.2: Chip stack visual for current bet */}
           <div className="text-center">
             <div className="text-casino-gold text-base sm:text-lg mb-1 sm:mb-2">Current Bet</div>
-            <div className="text-white text-2xl sm:text-3xl font-bold">${betAmount}</div>
+            {betAmount > 0 ? (
+              <ChipStack amount={betAmount} />
+            ) : (
+              <div className="text-white text-2xl sm:text-3xl font-bold">$0</div>
+            )}
           </div>
 
-          {/* Fix 5.5: Balance validation error message */}
           <AnimatePresence>
             {betError && (
               <motion.div
@@ -296,14 +396,12 @@ export const BlackjackTable = () => {
             <Button onClick={handlePlaceBet} variant="secondary">
               Add ${selectedChip}
             </Button>
-            {/* Fix 5.7: Undo last chip */}
             <Button onClick={handleUndoLastChip} variant="ghost" disabled={betAmount === 0}>
               Undo
             </Button>
             <Button onClick={handleClearBet} variant="danger" disabled={betAmount === 0}>
               Clear
             </Button>
-            {/* Fix 5.2: Rebet & Deal button */}
             <Button
               onClick={handleStartHand}
               disabled={betAmount === 0}
@@ -320,13 +418,13 @@ export const BlackjackTable = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex flex-col gap-3 sm:gap-4 items-center"
+          className="flex flex-col gap-3 sm:gap-4 items-center relative z-10"
         >
           <div className="flex gap-2 sm:gap-4 flex-wrap justify-center">
-            <Button onClick={() => { hit(); sounds.cardDeal(); }} variant="primary">
+            <Button onClick={handleHit} variant="primary">
               Hit
             </Button>
-            <Button onClick={() => { stand(); sounds.buttonClick(); }} variant="secondary">
+            <Button onClick={handleStand} variant="secondary">
               Stand
             </Button>
             {gameState.canDoubleDown && (
@@ -335,7 +433,7 @@ export const BlackjackTable = () => {
               </Button>
             )}
             {gameState.canSplit && (
-              <Button onClick={() => { split(); sounds.cardDeal(); }} variant="ghost">
+              <Button onClick={handleSplit} variant="ghost">
                 Split
               </Button>
             )}
@@ -359,7 +457,7 @@ export const BlackjackTable = () => {
 
       {/* Shoe Info */}
       {gameState && (
-        <div className="text-casino-gold text-xs sm:text-sm opacity-50">
+        <div className="text-casino-gold text-xs sm:text-sm opacity-50 relative z-10">
           Cards remaining: {gameState.shoeSize}
         </div>
       )}

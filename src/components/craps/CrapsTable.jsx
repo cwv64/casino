@@ -7,6 +7,7 @@ import { ChipSelector, Chip } from '../ui/Chip';
 import { DealerPuck } from '../ui/DealerPuck';
 import { useWalletStore } from '../../stores/walletStore';
 import { WinCelebration } from '../ui/WinCelebration';
+import { DealerChat } from '../ui/DealerChat';
 import { X } from 'lucide-react';
 import { sounds } from '../../utils/sounds';
 
@@ -173,6 +174,7 @@ export const CrapsTable = () => {
   const [showWinCelebration, setShowWinCelebration] = useState(false);
   const [winPayout, setWinPayout] = useState(0);
   const [betError, setBetError] = useState(null);
+  const [dealerEvent, setDealerEvent] = useState(null);
 
   // Fix 5.10: Track bet history as a stack for undo
   const betHistoryRef = useRef([]);
@@ -229,6 +231,7 @@ export const CrapsTable = () => {
 
     setIsRolling(true);
     setIsProcessing(true);
+    setDealerEvent('roll');
     sounds.diceRoll();
 
     if (navigator.vibrate) {
@@ -271,6 +274,20 @@ export const CrapsTable = () => {
 
         setHighlightedBets({ winners, losers });
 
+        // 3.3: Dealer chat based on roll outcome
+        const sevenOut = result.outcomes.find(o => o.event === 'sevenOut');
+        const pointMade = result.outcomes.find(o => o.event === 'pointMade');
+        const pointEstablished = result.outcomes.find(o => o.result === 'pointEstablished');
+        const hardwayWin = result.outcomes.find(o => o.bet?.startsWith('hard') && o.result === 'win');
+
+        if (sevenOut) setDealerEvent('sevenOut');
+        else if (pointMade) setDealerEvent('pointMade');
+        else if (pointEstablished) setDealerEvent('pointSet');
+        else if (hardwayWin) setDealerEvent('hardway');
+        else if (totalPayout >= 100) setDealerEvent('bigWin');
+        else if (result.roll.total === 7 && result.phase === 'comeOut') setDealerEvent('seven');
+        else if ([2, 3, 12].includes(result.roll.total)) setDealerEvent('craps');
+
         if (totalPayout > 0) {
           deposit(totalPayout);
           setWinPayout(totalPayout);
@@ -282,10 +299,11 @@ export const CrapsTable = () => {
           sounds.lose();
         }
 
+        // 3.7: Extended highlight duration from 2s to 3.5s
         setTimeout(() => {
           setHighlightedBets({ winners: [], losers: [] });
           setIsProcessing(false);
-        }, 2000);
+        }, 3500);
       } else {
         setIsProcessing(false);
       }
@@ -324,12 +342,16 @@ export const CrapsTable = () => {
   const betAreaProps = { highlightedBets, isProcessing, isRolling };
 
   return (
-    <div className="flex flex-col items-center gap-3 sm:gap-6 p-2 sm:p-6 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[700px] sm:min-h-[900px] rounded-2xl shadow-felt-depth max-w-full box-border overflow-x-hidden">
-      {/* Fix 5.8: Scaled win celebration */}
+    <div className="relative flex flex-col items-center gap-3 sm:gap-6 p-2 sm:p-6 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[700px] sm:min-h-[900px] rounded-2xl shadow-felt-depth max-w-full box-border overflow-x-hidden vignette">
       <WinCelebration show={showWinCelebration} payout={winPayout} />
 
+      {/* 3.3: Dealer chat */}
+      <div className="relative z-10">
+        <DealerChat game="craps" event={dealerEvent} />
+      </div>
+
       {/* Phase and Point Display */}
-      <div className="flex gap-2 sm:gap-8 items-center flex-wrap justify-center">
+      <div className="flex gap-2 sm:gap-8 items-center flex-wrap justify-center relative z-10">
         <div className="bg-black/40 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl border-2 border-casino-gold shadow-glow-gold">
           <div className="text-casino-gold text-xs sm:text-sm font-semibold">Phase</div>
           <div className="text-white text-base sm:text-xl font-bold capitalize">
@@ -354,7 +376,9 @@ export const CrapsTable = () => {
         </div>
       </div>
 
-      <ChipSelector onSelectChip={setSelectedChip} selectedChip={selectedChip} />
+      <div className="relative z-10">
+        <ChipSelector onSelectChip={setSelectedChip} selectedChip={selectedChip} />
+      </div>
 
       {/* Fix 5.6: Table limits display */}
       <div className="text-gray-400 text-[0.6rem] sm:text-xs">
@@ -376,7 +400,7 @@ export const CrapsTable = () => {
       </AnimatePresence>
 
       {/* Controls */}
-      <div className="flex gap-2 sm:gap-4 flex-wrap justify-center">
+      <div className="flex gap-2 sm:gap-4 flex-wrap justify-center relative z-10">
         <Button
           onClick={handleRoll}
           disabled={!canRoll}
@@ -405,7 +429,7 @@ export const CrapsTable = () => {
       </div>
 
       {/* Dice Display */}
-      <div className="bg-black/50 backdrop-blur-lg p-3 sm:p-8 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-casino-gold shadow-glow-gold-lg min-h-[80px] sm:min-h-[150px] flex items-center justify-center w-full max-w-md">
+      <div className="relative z-10 bg-black/50 backdrop-blur-lg p-3 sm:p-8 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-casino-gold shadow-glow-gold-lg min-h-[80px] sm:min-h-[150px] flex items-center justify-center w-full max-w-md">
         {rollResult ? (
           <DicePair
             die1={rollResult.roll.die1}
@@ -450,7 +474,7 @@ export const CrapsTable = () => {
       </AnimatePresence>
 
       {/* Main Craps Table Layout - 3 cols mobile, 7 cols desktop */}
-      <div className="w-full max-w-7xl bg-gradient-to-br from-casino-green-dark via-casino-green to-casino-green-light bg-felt-texture border-2 sm:border-8 border-casino-gold shadow-glow-gold-lg rounded-xl sm:rounded-3xl p-2 sm:p-8 relative box-border overflow-hidden">
+      <div className="w-full max-w-7xl bg-gradient-to-br from-casino-green-dark via-casino-green to-casino-green-light bg-felt-texture border-2 sm:border-8 border-casino-gold shadow-glow-gold-lg rounded-xl sm:rounded-3xl p-2 sm:p-8 relative box-border overflow-hidden z-10">
 
         {/* Number Boxes */}
         <div className="grid grid-cols-3 sm:grid-cols-7 gap-1 sm:gap-3 mb-2 sm:mb-6">
