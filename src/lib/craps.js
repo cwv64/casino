@@ -127,6 +127,9 @@ export class CrapsEngine {
   evaluateRoll(total, die1, die2) {
     const outcomes = [];
 
+    // Capture phase before evaluation (evaluatePointRoll may change it)
+    const phaseAtRoll = this.phase;
+
     // Evaluate phase-specific bets
     if (this.phase === 'comeOut') {
       outcomes.push(...this.evaluateComeOutRoll(total));
@@ -137,9 +140,9 @@ export class CrapsEngine {
     // Evaluate Come bets
     outcomes.push(...this.evaluateComeBets(total));
 
-    // Evaluate always-active bets
+    // Evaluate always-active bets (pass original phase since it may have changed)
     outcomes.push(...this.evaluateFieldBet(total));
-    outcomes.push(...this.evaluatePlaceBets(total));
+    outcomes.push(...this.evaluatePlaceBets(total, phaseAtRoll));
     outcomes.push(...this.evaluateHardways(total, die1, die2));
     outcomes.push(...this.evaluateOneRollBets(total));
 
@@ -521,7 +524,7 @@ export class CrapsEngine {
     return outcomes;
   }
 
-  evaluatePlaceBets(total) {
+  evaluatePlaceBets(total, phaseAtRoll) {
     const outcomes = [];
 
     // Fix 1.6: Place bet wins - payout is winnings only (bet stays on the table)
@@ -539,8 +542,8 @@ export class CrapsEngine {
       // Place bets stay up unless taken down - bet is NOT removed
     }
 
-    // Seven clears all place bets
-    if (total === 7 && this.phase === 'point') {
+    // Seven clears all place bets (use phaseAtRoll since evaluatePointRoll already changed this.phase)
+    if (total === 7 && phaseAtRoll === 'point') {
       Object.keys(this.bets.place).forEach(num => {
         if (this.bets.place[num] > 0) {
           outcomes.push({

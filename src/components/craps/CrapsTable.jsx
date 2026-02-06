@@ -104,7 +104,7 @@ const NumberBox = ({ number, displayText, gameState, handlePlaceBet, handleRemov
           <motion.div
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="absolute -top-5 sm:-top-8 z-10"
+            className="absolute -top-2 -right-2 sm:-top-8 sm:right-auto z-10"
           >
             <DealerPuck isOn={true} position={number} />
           </motion.div>
