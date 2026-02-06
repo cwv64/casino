@@ -168,10 +168,9 @@ export const CrapsTable = () => {
   const [lastBetSnapshot, setLastBetSnapshot] = useState(null);
   const [showWinCelebration, setShowWinCelebration] = useState(false);
 
-  const { gameState, rollResult, placeBet, removeBet, roll, resetBets, getTotalBets, balance } = useCraps();
+  // Fix 4.4: totalBets is now a memoized value from the hook, not a function call
+  const { gameState, rollResult, placeBet, removeBet, roll, resetBets, totalBets, balance } = useCraps();
   const { deposit } = useWalletStore();
-
-  const totalBets = getTotalBets();
   const canRoll = totalBets > 0 && !isRolling && !isProcessing;
 
   useEffect(() => {

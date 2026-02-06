@@ -35,6 +35,7 @@ export const hashToNumber = (hash, max) => {
 };
 
 // Generate shuffled deck using provably fair hash
+// Fix 4.1: Batch all SHA-256 hashes in parallel instead of 312 sequential awaits
 export const generateShuffledDeck = async (serverSeed, clientSeed, nonce, numDecks = 6) => {
   const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
   const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -49,11 +50,20 @@ export const generateShuffledDeck = async (serverSeed, clientSeed, nonce, numDec
     }
   }
 
-  // Fisher-Yates shuffle using provably fair randomness
+  // Pre-compute all hashes in parallel (instead of sequential awaits)
   const shuffled = [...deck];
+  const indices = [];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const hash = await generateGameResult(serverSeed, clientSeed, nonce + i);
-    const j = hashToNumber(hash, i + 1);
+    indices.push(i);
+  }
+  const hashes = await Promise.all(
+    indices.map(i => generateGameResult(serverSeed, clientSeed, nonce + i))
+  );
+
+  // Fisher-Yates shuffle using pre-computed hashes
+  for (let idx = 0; idx < indices.length; idx++) {
+    const i = indices[idx];
+    const j = hashToNumber(hashes[idx], i + 1);
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 

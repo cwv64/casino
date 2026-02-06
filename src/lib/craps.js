@@ -104,14 +104,16 @@ export class CrapsEngine {
 
     const outcomes = this.evaluateRoll(result.total, result.die1, result.die2);
 
-    // Save to history
-    addGameToHistory({
+    // Fix 4.5: Debounce localStorage writes — queue history entry instead of writing every roll
+    this._pendingHistory = this._pendingHistory || [];
+    this._pendingHistory.push({
       game: 'craps',
       roll: result,
       outcomes,
       phase: this.phase,
       point: this.point
     });
+    this._scheduleHistoryFlush();
 
     return {
       roll: result,
@@ -703,6 +705,20 @@ export class CrapsEngine {
     return Math.floor(betAmount * odds[point]);
   }
 
+  // Fix 4.5: Debounced localStorage flush — batches rapid rolls into one write
+  _scheduleHistoryFlush() {
+    if (this._flushTimer) return;
+    this._flushTimer = setTimeout(() => {
+      this._flushTimer = null;
+      if (this._pendingHistory && this._pendingHistory.length > 0) {
+        for (const entry of this._pendingHistory) {
+          addGameToHistory(entry);
+        }
+        this._pendingHistory = [];
+      }
+    }, 500);
+  }
+
   placeBet(betType, amount, number = null) {
     if (betType === 'place' && number) {
       this.bets.place[number] = (this.bets.place[number] || 0) + amount;
@@ -743,14 +759,43 @@ export class CrapsEngine {
     return true;
   }
 
+  // Fix 4.3: Structured shallow clone instead of JSON.parse(JSON.stringify())
   getGameState() {
     return {
       phase: this.phase,
       point: this.point,
       puckPosition: this.puckPosition,
-      bets: JSON.parse(JSON.stringify(this.bets)),
+      bets: {
+        passLine: this.bets.passLine,
+        dontPass: this.bets.dontPass,
+        come: this.bets.come,
+        dontCome: this.bets.dontCome,
+        field: this.bets.field,
+        odds: this.bets.odds,
+        anySeven: this.bets.anySeven,
+        anyCraps: this.bets.anyCraps,
+        comeNumbers: {
+          4: { ...this.bets.comeNumbers[4] },
+          5: { ...this.bets.comeNumbers[5] },
+          6: { ...this.bets.comeNumbers[6] },
+          8: { ...this.bets.comeNumbers[8] },
+          9: { ...this.bets.comeNumbers[9] },
+          10: { ...this.bets.comeNumbers[10] }
+        },
+        dontComeNumbers: {
+          4: { ...this.bets.dontComeNumbers[4] },
+          5: { ...this.bets.dontComeNumbers[5] },
+          6: { ...this.bets.dontComeNumbers[6] },
+          8: { ...this.bets.dontComeNumbers[8] },
+          9: { ...this.bets.dontComeNumbers[9] },
+          10: { ...this.bets.dontComeNumbers[10] }
+        },
+        place: { ...this.bets.place },
+        hardways: { ...this.bets.hardways },
+        horn: { ...this.bets.horn }
+      },
       lastRoll: this.lastRoll,
-      rollHistory: [...this.rollHistory],
+      rollHistory: this.rollHistory,
       nonce: this.nonce
     };
   }
