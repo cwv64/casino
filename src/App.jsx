@@ -26,7 +26,7 @@ const Modal = ({ isOpen, onClose, title, children }) => (
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          className="fixed inset-x-3 top-[10%] bottom-[10%] sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-charcoal border-2 border-casino-gold rounded-xl p-4 sm:p-8 sm:max-w-2xl sm:w-full overflow-y-auto z-50"
+          className="fixed inset-x-3 top-[10%] bottom-[10%] sm:inset-x-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-h-[85vh] bg-charcoal border-2 border-casino-gold rounded-xl p-4 sm:p-8 sm:max-w-2xl sm:w-full overflow-y-auto z-50"
         >
           <div className="flex justify-between items-center mb-4 sm:mb-6">
             <h2 className="text-lg sm:text-2xl font-bold text-casino-gold">{title}</h2>
