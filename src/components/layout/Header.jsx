@@ -1,8 +1,8 @@
 import { WalletDisplay } from '../ui/WalletDisplay';
-import { Settings, Info } from 'lucide-react';
+import { Settings, Info, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export const Header = ({ onOpenSettings, onOpenInfo }) => {
+export const Header = ({ onOpenSettings, onOpenInfo, onOpenRules }) => {
   return (
     <motion.header
       initial={{ y: -100 }}
@@ -18,6 +18,14 @@ export const Header = ({ onOpenSettings, onOpenInfo }) => {
 
         <div className="flex items-center gap-2 sm:gap-6">
           <WalletDisplay />
+
+          <button
+            onClick={onOpenRules}
+            className="p-2 hover:bg-charcoal-light rounded-lg transition-colors"
+            title="How to Play"
+          >
+            <HelpCircle className="text-casino-gold" size={20} />
+          </button>
 
           <button
             onClick={onOpenInfo}
