@@ -10,9 +10,10 @@ export const Header = ({ onOpenSettings, onOpenInfo, onOpenRules }) => {
       className="bg-charcoal border-b-2 border-casino-gold px-4 sm:px-8 py-3 sm:py-4"
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-casino-gold to-yellow-500 bg-clip-text text-transparent">
-            Premium Vegas Casino
+        <div className="flex items-center gap-2 sm:gap-4">
+          <img src="/logo.svg" alt="Lucky Roll Casino" className="w-8 h-8 sm:w-12 sm:h-12 rounded-full" />
+          <h1 className="text-lg sm:text-3xl font-bold bg-gradient-to-r from-casino-gold to-yellow-500 bg-clip-text text-transparent">
+            Lucky Roll Casino
           </h1>
         </div>
 

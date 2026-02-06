@@ -252,7 +252,7 @@ function App() {
           <div className="bg-charcoal-dark p-4 sm:p-6 rounded-lg border border-casino-gold">
             <h3 className="text-base sm:text-xl font-semibold text-casino-gold mb-3 sm:mb-4">About</h3>
             <p className="text-gray-300 mb-2 text-sm sm:text-base">
-              Premium Vegas Casino - A fully-featured casino web application
+              Lucky Roll Casino - A fully-featured casino web application
             </p>
             <p className="text-gray-400 text-xs sm:text-sm">
               Built with React, Vite, Tailwind CSS, and Framer Motion
