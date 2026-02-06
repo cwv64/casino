@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCraps } from '../../hooks/useCraps';
 import { DicePair } from '../ui/Dice';
@@ -8,6 +8,11 @@ import { DealerPuck } from '../ui/DealerPuck';
 import { useWalletStore } from '../../stores/walletStore';
 import { WinCelebration } from '../ui/WinCelebration';
 import { X } from 'lucide-react';
+import { sounds } from '../../utils/sounds';
+
+// Fix 5.6: Table limits
+const TABLE_MIN = 5;
+const TABLE_MAX = 500;
 
 // Extracted to top-level to avoid re-creation on every render (fix 6.4)
 const BetArea = ({ label, betType, amount, onClick, onRemove, disabled, className = '', tooltip, showAmount = true, highlightedBets, isProcessing, isRolling }) => {
@@ -165,47 +170,75 @@ export const CrapsTable = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [highlightedBets, setHighlightedBets] = useState({ winners: [], losers: [] });
   const [movingChips, setMovingChips] = useState([]);
-  const [lastBetSnapshot, setLastBetSnapshot] = useState(null);
   const [showWinCelebration, setShowWinCelebration] = useState(false);
+  const [winPayout, setWinPayout] = useState(0);
+  const [betError, setBetError] = useState(null);
+
+  // Fix 5.10: Track bet history as a stack for undo
+  const betHistoryRef = useRef([]);
 
   // Fix 4.4: totalBets is now a memoized value from the hook, not a function call
   const { gameState, rollResult, placeBet, removeBet, roll, resetBets, totalBets, balance } = useCraps();
   const { deposit } = useWalletStore();
   const canRoll = totalBets > 0 && !isRolling && !isProcessing;
 
-  useEffect(() => {
-    if (totalBets > 0 && !lastBetSnapshot) {
-      setLastBetSnapshot(JSON.parse(JSON.stringify(gameState?.bets)));
-    }
-  }, [totalBets, lastBetSnapshot, gameState?.bets]);
+  const showBetError = (msg) => {
+    setBetError(msg);
+    sounds.error();
+    setTimeout(() => setBetError(null), 2000);
+  };
 
   const handlePlaceBet = useCallback((betType, number = null) => {
-    if (balance >= selectedChip) {
-      placeBet(betType, selectedChip, number);
+    // Fix 5.6: Enforce table limits
+    if (selectedChip < TABLE_MIN) {
+      showBetError(`Minimum bet is $${TABLE_MIN}`);
+      return;
+    }
+    if (selectedChip > TABLE_MAX) {
+      showBetError(`Maximum bet is $${TABLE_MAX}`);
+      return;
+    }
+    // Fix 5.5: Balance validation
+    if (balance < selectedChip) {
+      showBetError(`Insufficient funds! Balance: $${balance.toLocaleString()}`);
+      return;
+    }
+
+    const result = placeBet(betType, selectedChip, number);
+    if (result.success) {
+      // Fix 5.10: Push to bet history stack
+      betHistoryRef.current.push({ betType, amount: selectedChip, number });
+      sounds.chipPlace();
       if (navigator.vibrate) {
         navigator.vibrate(30);
       }
+    } else if (result.error) {
+      showBetError(result.error);
     }
   }, [balance, selectedChip, placeBet]);
 
   const handleRemoveBet = useCallback((betType, number = null) => {
     const refunded = removeBet(betType, number);
     if (refunded) {
-      deposit(refunded);
+      sounds.chipRemove();
     }
-  }, [removeBet, deposit]);
+  }, [removeBet]);
 
   const handleRoll = async () => {
     if (!canRoll) return;
 
     setIsRolling(true);
     setIsProcessing(true);
+    sounds.diceRoll();
 
     if (navigator.vibrate) {
       navigator.vibrate([50, 30, 50]);
     }
 
     const result = await roll();
+
+    // Clear bet history after rolling (bets are locked in)
+    betHistoryRef.current = [];
 
     setTimeout(async () => {
       setIsRolling(false);
@@ -240,8 +273,13 @@ export const CrapsTable = () => {
 
         if (totalPayout > 0) {
           deposit(totalPayout);
+          setWinPayout(totalPayout);
           setShowWinCelebration(true);
+          if (totalPayout >= 100) sounds.bigWin();
+          else sounds.win();
           setTimeout(() => setShowWinCelebration(false), 3000);
+        } else if (losers.length > 0) {
+          sounds.lose();
         }
 
         setTimeout(() => {
@@ -267,31 +305,28 @@ export const CrapsTable = () => {
       }
     });
     if (total > 0) deposit(total);
-    setLastBetSnapshot(null);
+    betHistoryRef.current = [];
+    sounds.chipRemove();
   };
 
+  // Fix 5.10: Clear only the LAST bet placed (not all bets)
   const handleClearLastBet = () => {
-    if (!lastBetSnapshot) return;
-    const refund = resetBets();
-    let total = 0;
-    Object.values(refund).forEach(val => {
-      if (typeof val === 'number') total += val;
-      else if (typeof val === 'object') {
-        Object.values(val).forEach(v => {
-          if (typeof v === 'number') total += v;
-          else if (v.amount) total += v.amount + (v.odds || 0);
-        });
-      }
-    });
-    if (total > 0) deposit(total);
-    setLastBetSnapshot(null);
+    const history = betHistoryRef.current;
+    if (history.length === 0) return;
+
+    const lastBet = history.pop();
+    const refunded = removeBet(lastBet.betType, lastBet.number);
+    if (refunded > 0) {
+      sounds.chipRemove();
+    }
   };
 
   const betAreaProps = { highlightedBets, isProcessing, isRolling };
 
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-6 p-2 sm:p-6 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[700px] sm:min-h-[900px] rounded-2xl shadow-felt-depth max-w-full box-border overflow-x-hidden">
-      <WinCelebration show={showWinCelebration} />
+      {/* Fix 5.8: Scaled win celebration */}
+      <WinCelebration show={showWinCelebration} payout={winPayout} />
 
       {/* Phase and Point Display */}
       <div className="flex gap-2 sm:gap-8 items-center flex-wrap justify-center">
@@ -321,6 +356,25 @@ export const CrapsTable = () => {
 
       <ChipSelector onSelectChip={setSelectedChip} selectedChip={selectedChip} />
 
+      {/* Fix 5.6: Table limits display */}
+      <div className="text-gray-400 text-[0.6rem] sm:text-xs">
+        Table Limits: ${TABLE_MIN} - ${TABLE_MAX}
+      </div>
+
+      {/* Fix 5.5: Balance validation error */}
+      <AnimatePresence>
+        {betError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="bg-red-600/80 text-white px-4 py-2 rounded-lg border border-red-400 text-sm font-semibold"
+          >
+            {betError}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Controls */}
       <div className="flex gap-2 sm:gap-4 flex-wrap justify-center">
         <Button
@@ -340,12 +394,13 @@ export const CrapsTable = () => {
           Clear All
         </Button>
 
+        {/* Fix 5.10: Clear Last now only removes the last bet placed */}
         <Button
           onClick={handleClearLastBet}
-          disabled={!lastBetSnapshot || isProcessing || isRolling}
+          disabled={betHistoryRef.current.length === 0 || isProcessing || isRolling}
           variant="secondary"
         >
-          Clear Last
+          Undo Last
         </Button>
       </div>
 
