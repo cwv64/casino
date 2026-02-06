@@ -52,7 +52,7 @@ export const BlackjackTable = () => {
   const [betError, setBetError] = useState(null);
   const [showHandValues, setShowHandValues] = useState(false);
   const [dealerEvent, setDealerEvent] = useState(null);
-  const { gameState, isInitialized, startHand, hit, stand, doubleDown, split } = useBlackjack();
+  const { gameState, isInitialized, startHand, hit, stand, doubleDown, split, takeInsurance, declineInsurance } = useBlackjack();
   const { balance } = useWalletStore();
 
   // 3.1: Determine hand status for visual indicators
@@ -421,9 +421,11 @@ export const BlackjackTable = () => {
           className="flex flex-col gap-3 sm:gap-4 items-center relative z-10"
         >
           <div className="flex gap-2 sm:gap-4 flex-wrap justify-center">
-            <Button onClick={handleHit} variant="primary">
-              Hit
-            </Button>
+            {gameState.canHit && (
+              <Button onClick={handleHit} variant="primary">
+                Hit
+              </Button>
+            )}
             <Button onClick={handleStand} variant="secondary">
               Stand
             </Button>
@@ -452,6 +454,28 @@ export const BlackjackTable = () => {
               </label>
             </div>
           )}
+        </motion.div>
+      )}
+
+      {/* Insurance Offer */}
+      {gameState?.gameState === 'insurance-offer' && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-3 sm:gap-4 relative z-10 bg-black/60 border-2 border-casino-gold rounded-xl px-6 py-4 backdrop-blur-sm"
+        >
+          <div className="text-casino-gold text-base sm:text-lg font-bold">Insurance?</div>
+          <div className="text-white text-sm">
+            Dealer shows an Ace. Insurance costs ${Math.floor((gameState.bet || 0) / 2)} (half your bet) and pays 2:1 if the dealer has Blackjack.
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={takeInsurance} variant="primary">
+              Take Insurance
+            </Button>
+            <Button onClick={declineInsurance} variant="secondary">
+              No Insurance
+            </Button>
+          </div>
         </motion.div>
       )}
 

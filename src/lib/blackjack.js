@@ -21,10 +21,12 @@ export class BlackjackEngine {
     this.playerHands = [[]]; // Support for splits
     this.handBets = [0]; // Per-hand bet tracking (fix 1.2)
     this.currentHandIndex = 0;
-    this.gameState = 'betting'; // betting, dealing, player-turn, dealer-turn, finished
+    this.gameState = 'betting'; // betting, dealing, player-turn, insurance-offer, dealer-turn, finished
     this.bet = 0; // Total amount wagered (sum of all hand bets)
     this.result = null;
     this.shufflePromise = null; // Track pending shuffle (fix 1.7)
+    this.insuranceBet = 0;
+    this.insuranceResult = null;
   }
 
   async initialize() {
@@ -71,6 +73,8 @@ export class BlackjackEngine {
     this.currentHandIndex = 0;
     this.gameState = 'dealing';
     this.result = null;
+    this.insuranceBet = 0;
+    this.insuranceResult = null;
 
     // Deal initial cards (player, dealer, player, dealer)
     this.playerHands[0].push(await this.dealCard());
@@ -78,16 +82,24 @@ export class BlackjackEngine {
     this.playerHands[0].push(await this.dealCard());
     this.dealerHand.push(await this.dealCard());
 
-    // Check for blackjack
-    if (this.getHandValue(this.playerHands[0]) === 21) {
-      if (this.getHandValue(this.dealerHand) === 21) {
+    // Check for dealer ace (insurance offer) before checking player blackjack
+    const dealerShowsAce = this.dealerHand[0].rank === 'A';
+    const playerHasBlackjack = this.getHandValue(this.playerHands[0]) === 21;
+
+    if (playerHasBlackjack) {
+      if (dealerShowsAce) {
+        // Dealer shows ace + player has blackjack: offer insurance first
+        this.gameState = 'insurance-offer';
+      } else if (this.getHandValue(this.dealerHand) === 21) {
         this.gameState = 'finished';
-        // Fix 1.1: push returns the original bet
         this.result = { outcome: 'push', payout: this.bet };
       } else {
         this.gameState = 'finished';
         this.result = { outcome: 'blackjack', payout: this.bet * 2.5 }; // 3:2 payout
       }
+    } else if (dealerShowsAce) {
+      // Offer insurance before player turn
+      this.gameState = 'insurance-offer';
     } else {
       this.gameState = 'player-turn';
     }
@@ -97,6 +109,7 @@ export class BlackjackEngine {
 
   async hit() {
     if (this.gameState !== 'player-turn') return this.getGameState();
+    if (!this.canHit()) return this.getGameState();
 
     const currentHand = this.playerHands[this.currentHandIndex];
     currentHand.push(await this.dealCard());
@@ -110,6 +123,9 @@ export class BlackjackEngine {
       } else {
         this.checkAllHandsBust();
       }
+    } else if (handValue === 21) {
+      // Auto-stand on 21
+      await this.stand();
     }
 
     return this.getGameState();
@@ -176,6 +192,49 @@ export class BlackjackEngine {
     // Deal a card to each hand
     currentHand.push(await this.dealCard());
     newHand.push(await this.dealCard());
+
+    return this.getGameState();
+  }
+
+  async takeInsurance() {
+    if (this.gameState !== 'insurance-offer') return this.getGameState();
+
+    this.insuranceBet = Math.floor(this.bet / 2);
+    return this.resolveInsurance();
+  }
+
+  async declineInsurance() {
+    if (this.gameState !== 'insurance-offer') return this.getGameState();
+
+    this.insuranceBet = 0;
+    return this.resolveInsurance();
+  }
+
+  async resolveInsurance() {
+    const dealerHasBlackjack = this.getHandValue(this.dealerHand) === 21;
+    const playerHasBlackjack = this.getHandValue(this.playerHands[0]) === 21;
+
+    if (this.insuranceBet > 0) {
+      this.insuranceResult = dealerHasBlackjack
+        ? { outcome: 'win', payout: this.insuranceBet * 3 } // 2:1 pays back bet + 2x winnings
+        : { outcome: 'lose', payout: 0 };
+    }
+
+    if (playerHasBlackjack && dealerHasBlackjack) {
+      this.gameState = 'finished';
+      const insurancePayout = this.insuranceResult?.payout || 0;
+      this.result = { outcome: 'push', payout: this.bet + insurancePayout };
+    } else if (playerHasBlackjack) {
+      this.gameState = 'finished';
+      const insurancePayout = this.insuranceResult?.payout || 0;
+      this.result = { outcome: 'blackjack', payout: this.bet * 2.5 + insurancePayout };
+    } else if (dealerHasBlackjack) {
+      this.gameState = 'finished';
+      const insurancePayout = this.insuranceResult?.payout || 0;
+      this.result = { outcome: 'lose', payout: insurancePayout };
+    } else {
+      this.gameState = 'player-turn';
+    }
 
     return this.getGameState();
   }
@@ -271,6 +330,12 @@ export class BlackjackEngine {
     return value;
   }
 
+  canHit() {
+    if (this.gameState !== 'player-turn') return false;
+    const hand = this.playerHands[this.currentHandIndex];
+    return this.getHandValue(hand) < 21;
+  }
+
   canSplit() {
     if (this.gameState !== 'player-turn') return false;
     const hand = this.playerHands[this.currentHandIndex];
@@ -292,8 +357,11 @@ export class BlackjackEngine {
       bet: this.bet,
       handBets: [...this.handBets],
       result: this.result,
+      canHit: this.canHit(),
       canSplit: this.canSplit(),
       canDoubleDown: this.canDoubleDown(),
+      insuranceBet: this.insuranceBet,
+      insuranceResult: this.insuranceResult,
       shoeSize: this.shoe.length
     };
   }

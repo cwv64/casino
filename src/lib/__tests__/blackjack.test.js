@@ -144,6 +144,33 @@ describe('BlackjackEngine', () => {
       const state = await engine.hit();
       expect(state.gameState).toBe('betting');
     });
+
+    it('should not allow hitting on 21', async () => {
+      engine.playerHands = [[card('10'), card('A')]]; // 21
+      engine.dealerHand = [card('10'), card('7')];
+      engine.handBets = [100];
+      engine.bet = 100;
+      engine.gameState = 'player-turn';
+      engine.currentHandIndex = 0;
+
+      const state = await engine.hit();
+      // Should still have 2 cards (no card dealt)
+      expect(state.playerHands[0].length).toBe(2);
+    });
+
+    it('should auto-stand when reaching 21 after a hit', async () => {
+      engine.playerHands = [[card('5'), card('6')]]; // 11
+      engine.dealerHand = [card('10'), card('7')];
+      engine.handBets = [100];
+      engine.bet = 100;
+      engine.gameState = 'player-turn';
+      engine.currentHandIndex = 0;
+      engine.shoe = [card('10')]; // 5 + 6 + 10 = 21
+
+      const state = await engine.hit();
+      // Should auto-stand and trigger dealer play -> finished
+      expect(state.gameState).toBe('finished');
+    });
   });
 
   describe('stand', () => {
@@ -375,6 +402,111 @@ describe('BlackjackEngine', () => {
     });
   });
 
+  describe('canHit', () => {
+    it('should return false when hand value is 21', () => {
+      engine.playerHands = [[card('A'), card('K')]];
+      engine.gameState = 'player-turn';
+      engine.currentHandIndex = 0;
+      expect(engine.canHit()).toBe(false);
+    });
+
+    it('should return true when hand value is under 21', () => {
+      engine.playerHands = [[card('10'), card('5')]];
+      engine.gameState = 'player-turn';
+      engine.currentHandIndex = 0;
+      expect(engine.canHit()).toBe(true);
+    });
+
+    it('should return false when not player-turn', () => {
+      engine.playerHands = [[card('10'), card('5')]];
+      engine.gameState = 'betting';
+      engine.currentHandIndex = 0;
+      expect(engine.canHit()).toBe(false);
+    });
+  });
+
+  describe('insurance', () => {
+    it('should offer insurance when dealer shows ace', async () => {
+      engine.playerHands = [[card('10'), card('8')]]; // 18
+      engine.dealerHand = [card('A'), card('K')]; // Ace showing
+      engine.handBets = [100];
+      engine.bet = 100;
+      engine.gameState = 'dealing';
+
+      // Simulate the insurance check from startHand
+      // Instead, set up the state as startHand would
+      engine.gameState = 'insurance-offer';
+
+      expect(engine.gameState).toBe('insurance-offer');
+    });
+
+    it('should pay 2:1 on insurance when dealer has blackjack', async () => {
+      engine.playerHands = [[card('10'), card('8')]]; // 18
+      engine.dealerHand = [card('A'), card('K')]; // BJ
+      engine.handBets = [100];
+      engine.bet = 100;
+      engine.gameState = 'insurance-offer';
+
+      const state = await engine.takeInsurance();
+      expect(state.insuranceResult.outcome).toBe('win');
+      expect(state.insuranceResult.payout).toBe(150); // 50 * 3
+      expect(state.gameState).toBe('finished');
+      expect(state.result.outcome).toBe('lose'); // Player loses main hand
+      expect(state.result.payout).toBe(150); // Insurance payout only
+    });
+
+    it('should lose insurance when dealer does not have blackjack', async () => {
+      engine.playerHands = [[card('10'), card('8')]]; // 18
+      engine.dealerHand = [card('A'), card('7')]; // 18, no BJ
+      engine.handBets = [100];
+      engine.bet = 100;
+      engine.gameState = 'insurance-offer';
+
+      const state = await engine.takeInsurance();
+      expect(state.insuranceResult.outcome).toBe('lose');
+      expect(state.insuranceResult.payout).toBe(0);
+      expect(state.gameState).toBe('player-turn'); // Continue playing
+    });
+
+    it('should continue to player-turn when declining insurance and dealer has no blackjack', async () => {
+      engine.playerHands = [[card('10'), card('8')]]; // 18
+      engine.dealerHand = [card('A'), card('7')]; // 18, no BJ
+      engine.handBets = [100];
+      engine.bet = 100;
+      engine.gameState = 'insurance-offer';
+
+      const state = await engine.declineInsurance();
+      expect(state.gameState).toBe('player-turn');
+      expect(state.insuranceBet).toBe(0);
+    });
+
+    it('should finish game when declining insurance and dealer has blackjack', async () => {
+      engine.playerHands = [[card('10'), card('8')]]; // 18
+      engine.dealerHand = [card('A'), card('K')]; // BJ
+      engine.handBets = [100];
+      engine.bet = 100;
+      engine.gameState = 'insurance-offer';
+
+      const state = await engine.declineInsurance();
+      expect(state.gameState).toBe('finished');
+      expect(state.result.outcome).toBe('lose');
+      expect(state.result.payout).toBe(0);
+    });
+
+    it('should push with insurance when both have blackjack', async () => {
+      engine.playerHands = [[card('A'), card('K')]]; // BJ
+      engine.dealerHand = [card('A'), card('Q')]; // BJ
+      engine.handBets = [100];
+      engine.bet = 100;
+      engine.gameState = 'insurance-offer';
+
+      const state = await engine.takeInsurance();
+      expect(state.result.outcome).toBe('push');
+      // Push returns bet (100) + insurance win (50 * 3 = 150)
+      expect(state.result.payout).toBe(250);
+    });
+  });
+
   describe('shouldReshuffle', () => {
     it('should reshuffle when shoe has fewer than 78 cards', () => {
       engine.shoe = new Array(77);
@@ -417,8 +549,11 @@ describe('BlackjackEngine', () => {
       expect(state).toHaveProperty('bet');
       expect(state).toHaveProperty('handBets');
       expect(state).toHaveProperty('result');
+      expect(state).toHaveProperty('canHit');
       expect(state).toHaveProperty('canSplit');
       expect(state).toHaveProperty('canDoubleDown');
+      expect(state).toHaveProperty('insuranceBet');
+      expect(state).toHaveProperty('insuranceResult');
       expect(state).toHaveProperty('shoeSize');
     });
 

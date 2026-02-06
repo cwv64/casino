@@ -123,6 +123,34 @@ export const useBlackjack = () => {
     return { success: true, state };
   }, [engine, balance, withdraw, gameState]);
 
+  const takeInsurance = useCallback(async () => {
+    const insuranceCost = Math.floor((gameState?.bet || 0) / 2);
+    if (balance < insuranceCost) {
+      return { success: false, error: 'Insufficient funds for insurance' };
+    }
+
+    withdraw(insuranceCost);
+    const state = await engine.takeInsurance();
+    setGameState(state);
+
+    if (state.gameState === 'finished') {
+      handleGameEnd(state);
+    }
+
+    return { success: true, state };
+  }, [engine, balance, withdraw, gameState, handleGameEnd]);
+
+  const declineInsurance = useCallback(async () => {
+    const state = await engine.declineInsurance();
+    setGameState(state);
+
+    if (state.gameState === 'finished') {
+      handleGameEnd(state);
+    }
+
+    return { success: true, state };
+  }, [engine, handleGameEnd]);
+
   return {
     gameState,
     isInitialized,
@@ -131,6 +159,8 @@ export const useBlackjack = () => {
     stand,
     doubleDown,
     split,
+    takeInsurance,
+    declineInsurance,
     balance
   };
 };
