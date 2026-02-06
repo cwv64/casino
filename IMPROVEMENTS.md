@@ -1,261 +1,230 @@
-# Premium Vegas Casino - Improvement Recommendations
+# Lucky Roll Casino — Improvement Roadmap
 
-A comprehensive audit of the codebase identified the following areas for improvement, organized by category and priority.
-
----
-
-## 1. Bugs & Correctness Issues
-
-### 1.1 Blackjack push pays $0 instead of returning the bet
-**File:** `src/lib/blackjack.js:76`
-When both player and dealer have blackjack, `result.payout` is `0` but the player's bet was already withdrawn. The player loses their bet on a push.
-```js
-// Current (broken)
-this.result = { outcome: 'push', payout: 0 };
-// Fix: return the original bet
-this.result = { outcome: 'push', payout: this.bet };
-```
-
-### 1.2 Double down doubles `this.bet` globally, corrupting split payouts
-**File:** `src/lib/blackjack.js:124`
-`this.bet *= 2` mutates the shared bet field. If the player split first and then doubles on one hand, `determineWinner()` at line 207 divides `this.bet` evenly across all hands — so the non-doubled hand also pays out at the doubled rate.
-
-### 1.3 `handleGameEnd` used before it's defined in the `useCallback` dependency chain
-**File:** `src/hooks/useBlackjack.js:42`
-`startHand` references `handleGameEnd` but `handleGameEnd` is declared after `startHand`. Since both are `useCallback`s, `handleGameEnd` will be the stale initial closure on first render. This can cause the first hand's payout to silently fail.
-
-### 1.4 `doubleDown` in `useBlackjack` ignores the `faceDown` parameter
-**File:** `src/hooks/useBlackjack.js:69`
-The hook's `doubleDown` callback takes no arguments, so the `faceDown` parameter from `BlackjackTable` (line 53) is never forwarded to the engine.
-
-### 1.5 Wallet balance can go negative
-**File:** `src/utils/localStorage.js:43`
-`updateWalletBalance` does not check for negative results. If two rapid operations interleave (e.g., placing a craps bet while a blackjack hand resolves), the balance can go below zero.
-
-### 1.6 Craps: Place bets don't reset on win
-**File:** `src/lib/craps.js:536`
-The comment says "Place bets stay up unless taken down," which is correct casino behavior. However, the payout calculation at line 532 includes the original bet (`betAmount + payout`), effectively both paying and returning the bet — but the bet is never removed, creating a double-credit situation on the next win.
-
-### 1.7 `dealCard` calls async `shuffleShoe` synchronously
-**File:** `src/lib/blackjack.js:46-49`
-`dealCard()` is synchronous but calls `this.shuffleShoe()` which is async. The shuffle promise is never awaited, meaning cards can be dealt from the old depleted shoe.
-
-### 1.8 Craps Don't Come push on 12 doesn't refund
-**File:** `src/lib/craps.js:420-425`
-On a push, `payout` is set to `this.bets.dontCome` but the bet is zeroed out. The push payout is included in the outcomes array, but the CrapsTable component only calls `deposit()` for outcomes with `result === 'win'` (line 226-238). The push refund is lost.
+Fresh audit of the codebase after completing initial bug fixes, mobile improvements, performance optimizations, UX improvements, and test coverage.
 
 ---
 
-## 2. Accessibility (A11y)
+## 1. New Games & Game Features
 
-### 2.1 No ARIA labels on interactive elements
-All game action buttons (`Hit`, `Stand`, `Roll Dice`, bet areas) lack `aria-label` attributes. Screen readers cannot communicate the meaning of these controls.
+### 1.1 Roulette Table
+Add a fully-featured roulette game with European (single-zero) and American (double-zero) variants. Inside bets (straight, split, street, corner, line) and outside bets (red/black, odd/even, dozens, columns). Animated spinning wheel with ball physics.
 
-### 2.2 Color-only state indication
-Win/loss/push outcomes and bet states are communicated entirely through color (green/red/gold). Users with color vision deficiency cannot distinguish these states. Add icons or text labels.
+### 1.2 Video Poker (Jacks or Better)
+Classic 5-card draw poker with hold/draw mechanic. Pay table displayed on screen. Correct strategy hints as an optional toggle.
 
-### 2.3 No keyboard navigation for craps table
-The craps table relies on mouse click and right-click interactions. There's no keyboard support for placing/removing bets, making the game unusable without a mouse.
+### 1.3 Blackjack: Insurance Bet
+When the dealer shows an Ace, offer the player an insurance side bet (pays 2:1 if dealer has blackjack). Standard casino feature currently missing.
 
-### 2.4 No focus management after state changes
-After dealing cards or rolling dice, focus isn't moved to the result area. Screen reader users have no indication that something changed.
+### 1.4 Blackjack: Surrender Option
+Add late surrender — player forfeits half their bet to fold a bad hand before the dealer checks for blackjack. Togglable in settings.
 
-### 2.5 Right-click to remove bets is undiscoverable
-The only instruction is a small text at the bottom. Mobile users on touch devices have no way to remove individual bets (long-press is not implemented).
+### 1.5 Blackjack: Even Money
+When the player has blackjack and the dealer shows an Ace, offer "Even Money" (guaranteed 1:1 payout instead of risking a push).
 
-### 2.6 Missing `<title>` and landmark elements
-The page has no `<main>`, `<nav>`, or `<section>` landmark roles beyond the raw HTML. The document `<title>` is likely the default Vite title.
+### 1.6 Blackjack: Side Bets
+Perfect Pairs (pays if first two cards are a pair), 21+3 (poker-style hand with player's two cards + dealer upcard). Optional side bet panel.
 
----
+### 1.7 Multi-Hand Blackjack
+Allow playing 1-3 hands simultaneously against the same dealer. Each hand has its own bet and decisions.
 
-## 3. Mobile & Responsive Design
+### 1.8 Craps: Lay Bets
+Add lay bets (betting a 7 will come before a specific number). Currently only place bets are implemented for number betting.
 
-### 3.1 Chip selector overflows on small screens
-**File:** `src/components/ui/Chip.jsx:40`
-Six 64px chips in a row (384px + gaps) overflow viewports under 430px. The container has no `flex-wrap` or horizontal scroll.
+### 1.9 Craps: Big 6 / Big 8
+Simple even-money bet that 6 or 8 will roll before 7. Easy for beginners, visible on the table layout.
 
-### 3.2 Card size is fixed at `w-20 h-28`
-**File:** `src/components/ui/Card.jsx:29`
-Cards don't scale down on mobile. With split hands, 4+ cards overflow the screen horizontally.
-
-### 3.3 Header layout breaks on narrow screens
-**File:** `src/components/layout/Header.jsx:12`
-The header uses `justify-between` with no wrap, causing the title and wallet/buttons to overlap below ~500px.
-
-### 3.4 Craps table requires horizontal scroll on mobile
-The 7-column grid at `CrapsTable.jsx:401` with `gap-3` and border-8 is too wide for mobile viewports, even with the responsive adjustments.
-
-### 3.5 No touch-friendly bet removal on craps
-Right-click is not available on mobile. Need long-press or a dedicated "Remove" button per bet area.
+### 1.10 Slots (3-Reel Classic)
+Simple 3-reel slot machine with configurable pay lines. Uses the same provably fair system for reel positions.
 
 ---
 
-## 4. Performance
+## 2. Accessibility
 
-### 4.1 Provably fair deck shuffle is O(n) SHA-256 hashes
-**File:** `src/utils/provablyFair.js:54-58`
-The Fisher-Yates shuffle awaits a SHA-256 hash for each of 312 cards. That's 312 sequential async crypto operations on every shuffle. This should be batched or use a single seed to generate a PRNG stream.
+### 2.1 ARIA Labels on All Interactive Elements
+Most buttons and interactive areas lack `aria-label` attributes. Every game action button (Hit, Stand, Double, Split, Roll, place bet areas), chip selector, modal controls, and header buttons need descriptive labels for screen readers.
 
-### 4.2 `Modal` component is re-created every render
-**File:** `src/App.jsx:17`
-The `Modal` component is defined inline inside `App()`. React creates a new component type each render, causing full unmount/remount of modal DOM on every App state change.
+### 2.2 Reduced Motion Support
+Add `@media (prefers-reduced-motion: reduce)` to disable or simplify all animations: card deals, dice rolls, confetti celebrations, modal transitions, and header slide-in. Users with vestibular disorders or seizure sensitivity need this.
 
-### 4.3 `getGameState()` deep-clones bets on every call
-**File:** `src/lib/craps.js:750`
-`JSON.parse(JSON.stringify(this.bets))` is called every time state is read. In the craps flow, `getGameState()` is called after every `placeBet`, `removeBet`, and `roll` — meaning frequent full deep-clones of a large nested object.
+### 2.3 Focus Management in Modals
+When a modal opens, focus should trap inside it. When it closes, focus should return to the trigger button. Currently focus can escape to background elements.
 
-### 4.4 `getTotalBets` recalculates on every render
-**File:** `src/hooks/useCraps.js:78`
-`getTotalBets` is a `useCallback` that's called directly in the render body of `CrapsTable` (line 23: `const totalBets = getTotalBets()`). This recalculates on every render. Should be a derived value from state, ideally with `useMemo`.
+### 2.4 Semantic HTML Landmarks
+Replace generic `<div>` containers with `<main>`, `<nav>`, `<section>`, `<aside>` where appropriate. Add `role` attributes to game areas.
 
-### 4.5 Game history writes to localStorage on every craps roll
-**File:** `src/lib/craps.js:108`
-Every single dice roll writes to localStorage. With rapid rolls, this can cause jank on low-end devices.
+### 2.5 Color-Blind Friendly State Indicators
+Win/loss/push states are communicated primarily through color (green/red/gold). Add icons (checkmark, X, equals) alongside colors so color-blind users can distinguish outcomes.
 
----
+### 2.6 Keyboard Shortcuts for Game Actions
+- Blackjack: `H` = Hit, `S` = Stand, `D` = Double Down, `P` = Split
+- Craps: `R` = Roll Dice, `U` = Undo Last Bet, number keys for chip selection
+- Global: `Esc` = Close modal, `?` = Show rules
 
-## 5. User Experience (UX)
-
-### 5.1 No hand value display
-The blackjack table shows cards but doesn't display the current hand value to the player. The `getHandValue` function exists in `BlackjackTable.jsx` (line 56) but is never called in the render output. Players must mentally count card values.
-
-### 5.2 No "New Hand" / "Play Again" button after a hand ends
-After a blackjack hand finishes, the player must manually adjust their bet and click "Deal Cards" again. A quick "Rebet & Deal" button would speed up play.
-
-### 5.3 No game history UI
-Game history is stored (last 100 games) but there's no UI to view it. The `gameStore` tracks history that players can never see.
-
-### 5.4 No sound effects
-The settings store has `soundEnabled: true` as a default, but no audio is implemented anywhere. The setting is misleading.
-
-### 5.5 No balance validation feedback
-When a player tries to bet more than their balance, nothing visible happens. There's no error toast, shake animation, or disabled state explanation.
-
-### 5.6 Craps bet minimum/maximum not enforced
-Players can bet any amount with no table minimum or maximum. Real craps tables have limits that affect strategy.
-
-### 5.7 No undo for the last bet placed
-Once a chip is added to the bet in blackjack, the only option is "Clear Bet" which removes everything. An undo-last-chip feature would help.
-
-### 5.8 Confetti fires on small wins
-The win celebration fires identically for a $5 field bet win and a $1000 blackjack. Celebration intensity should scale with payout.
-
-### 5.9 No tutorial or rules explanation
-New players have no onboarding. Craps in particular is notoriously complex, and the UI assumes full knowledge of all bet types.
-
-### 5.10 "Clear Last Bet" in craps actually clears ALL bets
-**File:** `src/components/craps/CrapsTable.jsx:271-288`
-Despite the label, `handleClearLastBet` calls `resetBets()` which removes every bet, then sets `lastBetSnapshot` to null. It's functionally identical to "Clear All Bets."
+### 2.7 Screen Reader Announcements
+Use `aria-live` regions to announce game results, dice roll outcomes, and balance changes so screen reader users get real-time updates without needing to manually re-read the page.
 
 ---
 
-## 6. Code Quality & Architecture
+## 3. Visual & Animation Improvements
 
-### 6.1 Game engines mix business logic with side effects
-`CrapsEngine.roll()` (line 108) directly writes to localStorage via `addGameToHistory`. Game engines should be pure — persistence should be handled by the hooks or stores.
+### 3.1 Bust / Win Visual Indicators on Hand
+When a blackjack hand busts, flash the hand area red with a "BUST" stamp overlay. When winning, pulse the hand green. Currently only the result banner shows the outcome.
 
-### 6.2 Duplicated hand value calculation
-Hand value is computed in both `BlackjackEngine.getHandValue()` and `BlackjackTable.getHandValue()` with slightly different implementations. This violates DRY and risks divergence.
+### 3.2 Chip Stacking Animation
+When increasing a bet, animate chips stacking visually in the bet area instead of just updating a number. Show actual chip graphics building up.
 
-### 6.3 Inconsistent error handling patterns
-- `walletStore.withdraw` returns `{ success, balance, error }`
-- `useBlackjack.startHand` returns `{ success, error }` or `{ success, state }`
-- `useCraps.placeBet` returns `{ success, error }` or `{ success, state }`
-- `engine.hit()` returns the game state directly with no error wrapper
+### 3.3 Dealer Persona / Chat Bubbles
+Add a simple animated dealer avatar that shows contextual quips: "Nice hand!", "Tough break", "Blackjack!", "Snake eyes!". Adds personality and engagement.
 
-There's no consistent result type across the codebase.
+### 3.4 Card Flip Animation Improvement
+Current card animations use opacity crossfade between front/back. A true 3D flip rotation (CSS `transform: rotateY`) would look more realistic. The dealer hole card reveal especially benefits from a dramatic flip.
 
-### 6.4 `BetArea` and `NumberBox` defined inside `CrapsTable` render
-**File:** `src/components/craps/CrapsTable.jsx:34,80`
-These are full components with props, hooks (`motion`), and conditional logic, but they're defined inside the parent component function. They are re-created on every render, which defeats React's reconciliation and causes unnecessary DOM churn.
+### 3.5 Craps Dice Animation Polish
+Add a more realistic dice-rolling animation with tumbling, bouncing, and settling. Current animation is functional but could feel more physical with spring physics and randomized rotation.
 
-### 6.5 No TypeScript
-The entire project is plain JavaScript with JSX. There are `@types/react` devDependencies installed but unused. TypeScript would catch many of the bugs listed above at compile time (null access, wrong argument types, missing parameters).
+### 3.6 Table Felt Texture
+The felt background uses a CSS gradient. A subtle SVG noise texture overlay would add realism. Could also add a slight vignette effect at the table edges.
 
-### 6.6 No linting or formatting config
-No ESLint, Prettier, or any other code quality tooling configured. Inconsistencies like mixed quote styles and varied spacing patterns exist throughout.
+### 3.7 Winning Bet Highlight Duration
+When a bet wins or loses in craps, the visual highlight only lasts ~2 seconds. Extend to 3-4 seconds or until the next roll so players can clearly see which bets resolved.
 
----
-
-## 7. Testing
-
-### 7.1 Zero test coverage
-There are no test files, no test runner (Jest/Vitest), and no testing libraries in dependencies. For a project with complex game logic and financial calculations (payouts, odds), this is a significant risk.
-
-**Priority tests to add:**
-- `BlackjackEngine`: hand value calculation, blackjack detection, split/double down payout math, shoe reshuffling
-- `CrapsEngine`: every bet type's win/loss/push conditions, odds payout calculations, phase transitions
-- `walletStore`: deposit/withdraw race conditions, negative balance prevention
-- `provablyFair`: deterministic output for same seeds, uniform distribution of deck shuffle
+### 3.8 Card Shadows and Depth
+Add subtle drop shadows to cards that increase when cards overlap (split hands). Creates visual depth hierarchy.
 
 ---
 
-## 8. Security & Integrity
+## 4. UX Improvements
 
-### 8.1 Client-side "provably fair" has no server component
-The server seed and client seed are both generated in the browser. A user can open DevTools, read both seeds, and predict every future outcome. The provably fair system provides no actual integrity guarantee without a real server.
+### 4.1 Session Statistics Dashboard
+Track and display: total hands played, win/loss record, biggest single win, current streak, session net profit/loss, time played. Accessible from the settings modal or a dedicated stats button.
 
-### 8.2 Wallet balance stored in plaintext localStorage
-Users can open DevTools and run `localStorage.setItem('casino_wallet', JSON.stringify({balance: 999999}))` to give themselves unlimited chips. If this is for entertainment only, that's fine — but it should be documented as such.
+### 4.2 Provably Fair Verification UI
+Currently seeds are generated but players can't verify past results. Add a panel where players can see the server seed hash (before reveal), enter/change their client seed, and after a hand, see the revealed server seed + hash verification.
 
-### 8.3 No rate limiting on bet placement
-A script could place bets and roll dice programmatically at high speed. For a client-only app this isn't critical, but if any backend is ever added, this becomes exploitable.
+### 4.3 Animation Speed Control
+The settings store has an `animationSpeed` field but it's not wired to anything. Connect it to card deal delays, dice roll duration, and result display timing. Options: Slow, Normal, Fast, Instant.
 
----
+### 4.4 Theme Customization
+The settings store has a `theme` field that does nothing. Add at minimum: felt color (green, blue, red), card back design (classic red, blue, black), and light/dark mode.
 
-## 9. Build, Deployment & DevOps
+### 4.5 Quick Bet Presets
+Let players save favorite bet amounts (e.g., "My $50 bet", "Max bet") as one-tap presets. Especially useful for craps where the same bet combinations are repeated.
 
-### 9.1 No environment-based configuration
-The base path `/casino/` is hardcoded in `vite.config.js`. If deployed anywhere other than GitHub Pages at that exact path, it breaks. Should use an environment variable.
+### 4.6 Toast Notification System
+Replace inline error/success messages with a proper toast notification system. Toasts stack in a corner, auto-dismiss, and don't interfere with gameplay layout.
 
-### 9.2 No CI checks beyond deployment
-The GitHub Actions workflow only builds and deploys. No linting, type checking, or test execution step. Broken code can deploy to production.
+### 4.7 Bet Confirmation on Large Bets
+When placing a bet that exceeds 25% of the player's balance, show a confirmation dialog. Prevents accidental large bets, especially on mobile where mis-taps happen.
 
-### 9.3 No source maps in production
-The Vite config doesn't configure source maps. Production errors will be undebuggable.
+### 4.8 Hot/Cold Number Display for Craps
+Show which numbers have been rolling frequently (hot) and which haven't appeared in a while (cold). Common feature on real craps displays.
 
-### 9.4 No PWA support
-A casino app is a good candidate for a Progressive Web App — installable, works offline (already fully client-side), with push notifications for "daily bonus" features.
+### 4.9 Running Shoe Composition (Card Counting Aid)
+Optional toggle to show the remaining card composition in the shoe (how many of each rank remain). Educational tool for learning card counting concepts.
 
-### 9.5 External font loaded without fallback
-**File:** `src/index.css:1`
-The Google Fonts import for Inter is render-blocking. If the CDN is slow or unavailable, the page appears blank until timeout. Use `font-display: swap` or self-host the font.
-
----
-
-## 10. Missing Features That Would Add Significant Value
-
-| Feature | Impact | Effort |
-|---------|--------|--------|
-| **Roulette game** | High — most requested casino game | Medium |
-| **Poker (Texas Hold'em)** | High — deep gameplay | High |
-| **Statistics dashboard** | Medium — track win rate, biggest win, session P&L | Low |
-| **Bet history panel** | Medium — shows recent bets and outcomes | Low |
-| **Sound effects** | Medium — drastically improves immersion | Low |
-| **Keyboard shortcuts** | Medium — H for hit, S for stand, D for double | Low |
-| **Animation speed settings** | Low — the setting exists in storage but does nothing | Low |
-| **Dark/light theme toggle** | Low — the setting exists in storage but does nothing | Medium |
-| **Multiplayer (WebSocket)** | High — social craps is the real experience | Very High |
-| **Daily bonus chips** | Medium — increases return visits | Low |
-| **Achievement system** | Medium — gamification of the gamification | Medium |
-| **Seed verification UI** | Low — let players actually verify past hands | Low |
+### 4.10 Auto-Rebet Toggle
+Add a toggle that automatically places the same bet after each hand completes. Player just clicks "Deal" without re-selecting chips. Speeds up gameplay significantly.
 
 ---
 
-## Summary
+## 5. Mobile Experience
 
-| Category | Issues Found |
-|----------|-------------|
-| Bugs & Correctness | 8 |
-| Accessibility | 6 |
-| Mobile & Responsive | 5 |
-| Performance | 5 |
-| User Experience | 10 |
-| Code Quality | 6 |
-| Testing | 1 (critical) |
-| Security | 3 |
-| Build & DevOps | 5 |
-| Missing Features | 12 |
-| **Total** | **61** |
+### 5.1 Bottom Action Bar for Blackjack
+On mobile, game action buttons (Hit/Stand/Double/Split) should be in a fixed bottom bar for easy thumb access, instead of mid-screen where they require reaching.
 
-The highest-priority items are the **payout bugs** (sections 1.1, 1.2, 1.6, 1.8), **missing hand value display** (5.1), and **adding a test suite** (7.1). These directly affect game correctness and player trust.
+### 5.2 Swipe Gestures
+Swipe left to Stand, swipe right to Hit in blackjack. Swipe up on a chip to add it to the bet. Natural mobile interactions.
+
+### 5.3 Haptic Feedback Patterns
+Currently `navigator.vibrate` is used minimally. Add distinct vibration patterns: short buzz for chip place, double buzz for win, long buzz for bust, triple for blackjack.
+
+### 5.4 Landscape Mode Optimization
+The craps table especially benefits from landscape orientation. Detect orientation and reorganize the layout: wider table grid, side-by-side bet panel and table.
+
+### 5.5 Pinch-to-Zoom on Craps Table
+The craps table is information-dense. Allow pinch-to-zoom on the table area while keeping the bet controls accessible.
+
+### 5.6 Mobile-First Craps Layout
+Reorganize the craps table for mobile as a scrollable vertical layout: Pass Line section at top, then Place Bets, then Proposition Bets. Current 7-column grid is too cramped below 768px.
+
+---
+
+## 6. Architecture & Code Quality
+
+### 6.1 Separate Game Engine Side Effects
+`CrapsEngine.roll()` directly writes to localStorage via `addGameToHistory()`. Game engines should be pure — persistence should be handled by the React hooks/stores layer. This improves testability and reusability.
+
+### 6.2 Deduplicate Hand Value Calculation
+`BlackjackEngine.getHandValue()` and `BlackjackTable.getHandValue()` implement the same logic differently. The table component's version handles `faceDown` cards and soft/hard display, while the engine's doesn't. Consolidate into one exported function.
+
+### 6.3 Unified Result Types
+Return types are inconsistent: `walletStore.withdraw` returns `{ success, balance, error }`, hooks return `{ success, state }` or `{ success, error }`, engine methods return raw state. Define a shared `Result<T>` pattern.
+
+### 6.4 Extract Craps Sub-Components
+`BetArea`, `NumberBox`, and chip display logic are defined inline inside `CrapsTable`. These should be extracted to separate files to improve readability, enable memoization, and reduce the 500+ line component.
+
+### 6.5 TypeScript Migration
+The project has `@types/react` installed but no TypeScript. A gradual migration starting with the game engines would catch many potential bugs at compile time (null access, wrong argument types, missing parameters).
+
+### 6.6 ESLint + Prettier Configuration
+No linting or formatting configuration exists. Add ESLint with React plugin and Prettier for consistent code style. Add as a pre-commit hook.
+
+### 6.7 Error Boundary Component
+No React Error Boundary exists. If any component throws during render, the entire app crashes. Add an error boundary that shows a recovery UI and preserves the player's balance.
+
+### 6.8 Environment Configuration
+Hard-coded values like the GitHub Pages base path (`/casino/`), default balance ($1,000), table limits ($5/$500), and reshuffle threshold (78 cards) should be extracted to a configuration file or environment variables.
+
+---
+
+## 7. PWA & Offline Support
+
+### 7.1 Service Worker for Offline Play
+Register a service worker to cache the app shell and enable offline gameplay. Since there's no backend, the entire app can work offline once loaded.
+
+### 7.2 App Manifest
+Add a `manifest.json` with proper icons, theme color, display mode, and start URL so the app can be installed as a PWA on mobile home screens.
+
+### 7.3 Export / Import Save Data
+Let players export their balance, history, and settings as a JSON file and import it on another device. Useful since data lives in localStorage which is device-specific.
+
+---
+
+## 8. Engagement Features
+
+### 8.1 Achievement System
+Award badges for milestones: "First Blackjack", "Won $1,000 in a session", "Hit a Hard 8", "10-hand win streak", "Played 100 hands". Display in a trophy case.
+
+### 8.2 Daily Bonus
+Award free chips once per day (tracked via localStorage timestamp). Encourages return visits. Bonus amount could scale with consecutive days.
+
+### 8.3 Challenge Mode
+Pre-set scenarios: "Turn $100 into $500 in 20 hands", "Win 5 craps rolls in a row with pass line bet". Adds structured gameplay goals.
+
+### 8.4 Leaderboard (Local)
+Track personal bests: highest balance reached, biggest single win, longest win streak, most profitable session. No backend needed — all localStorage.
+
+---
+
+## Priority Matrix
+
+| # | Item | Impact | Effort | Priority |
+|---|------|--------|--------|----------|
+| 2.1 | ARIA labels | High | Low | **P0** |
+| 2.2 | Reduced motion | High | Low | **P0** |
+| 2.6 | Keyboard shortcuts | High | Medium | **P1** |
+| 4.1 | Session statistics | High | Medium | **P1** |
+| 4.2 | Provably fair verification | High | Medium | **P1** |
+| 1.1 | Roulette | High | High | **P1** |
+| 3.1 | Bust/win indicators | Medium | Low | **P1** |
+| 4.10 | Auto-rebet | Medium | Low | **P1** |
+| 5.1 | Bottom action bar | Medium | Low | **P1** |
+| 6.1 | Engine side effects | Medium | Medium | **P2** |
+| 6.2 | Deduplicate hand value | Medium | Low | **P2** |
+| 6.4 | Extract craps components | Medium | Medium | **P2** |
+| 4.3 | Animation speed | Medium | Low | **P2** |
+| 8.1 | Achievements | Medium | High | **P2** |
+| 7.1 | Offline PWA | Medium | Medium | **P2** |
+| 1.2 | Video Poker | Medium | High | **P3** |
+| 1.10 | Slots | Medium | High | **P3** |
+| 6.5 | TypeScript | High | Very High | **P3** |
