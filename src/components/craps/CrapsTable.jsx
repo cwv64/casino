@@ -226,6 +226,9 @@ export const CrapsTable = () => {
           if (outcome.result === 'win') {
             winners.push(outcome.bet);
             totalPayout += outcome.payout;
+          } else if (outcome.result === 'push') {
+            // Fix 1.8: push refunds the bet amount
+            totalPayout += outcome.payout;
           } else if (outcome.result === 'lose') {
             losers.push(outcome.bet);
           }

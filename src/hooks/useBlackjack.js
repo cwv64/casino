@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { BlackjackEngine } from '../lib/blackjack';
 import { useWalletStore } from '../stores/walletStore';
 import { useGameStore } from '../stores/gameStore';
@@ -10,6 +10,12 @@ export const useBlackjack = () => {
   const { balance, withdraw, deposit } = useWalletStore();
   const { setCurrentGame, endGame } = useGameStore();
 
+  // Fix 1.3: use refs for deposit/endGame to avoid stale closure issues
+  const depositRef = useRef(deposit);
+  const endGameRef = useRef(endGame);
+  depositRef.current = deposit;
+  endGameRef.current = endGame;
+
   useEffect(() => {
     const init = async () => {
       await engine.initialize();
@@ -17,6 +23,21 @@ export const useBlackjack = () => {
     };
     init();
   }, [engine]);
+
+  // Fix 1.3: handleGameEnd defined first using refs, no stale closure
+  const handleGameEnd = useCallback((state) => {
+    if (state.result && state.result.payout > 0) {
+      depositRef.current(state.result.payout);
+    }
+
+    endGameRef.current({
+      type: 'blackjack',
+      result: state.result.outcome,
+      bet: state.bet,
+      payout: state.result.payout,
+      netWin: state.result.payout - state.bet
+    });
+  }, []);
 
   const startHand = useCallback(async (betAmount) => {
     if (!isInitialized || balance < betAmount) {
@@ -42,10 +63,10 @@ export const useBlackjack = () => {
     }
 
     return { success: true, state };
-  }, [isInitialized, balance, withdraw, setCurrentGame, engine]);
+  }, [isInitialized, balance, withdraw, setCurrentGame, engine, handleGameEnd]);
 
-  const hit = useCallback(() => {
-    const state = engine.hit();
+  const hit = useCallback(async () => {
+    const state = await engine.hit();
     setGameState(state);
 
     if (state.gameState === 'finished') {
@@ -53,10 +74,10 @@ export const useBlackjack = () => {
     }
 
     return state;
-  }, [engine]);
+  }, [engine, handleGameEnd]);
 
-  const stand = useCallback(() => {
-    const state = engine.stand();
+  const stand = useCallback(async () => {
+    const state = await engine.stand();
     setGameState(state);
 
     if (state.gameState === 'finished') {
@@ -64,18 +85,20 @@ export const useBlackjack = () => {
     }
 
     return state;
-  }, [engine]);
+  }, [engine, handleGameEnd]);
 
-  const doubleDown = useCallback(() => {
-    const currentBet = gameState?.bet || 0;
-    const additionalBet = currentBet;
+  // Fix 1.4: accept and forward the faceDown parameter
+  const doubleDown = useCallback(async (faceDown = true) => {
+    // Fix 1.2 compatible: use per-hand bet from handBets array
+    const currentHandBet = gameState?.handBets?.[gameState?.currentHandIndex] || gameState?.bet || 0;
+    const additionalBet = currentHandBet;
 
     if (balance < additionalBet) {
       return { success: false, error: 'Insufficient funds for double down' };
     }
 
     withdraw(additionalBet);
-    const state = engine.doubleDown();
+    const state = await engine.doubleDown(faceDown);
     setGameState(state);
 
     if (state.gameState === 'finished') {
@@ -83,35 +106,22 @@ export const useBlackjack = () => {
     }
 
     return { success: true, state };
-  }, [engine, balance, withdraw, gameState]);
+  }, [engine, balance, withdraw, gameState, handleGameEnd]);
 
-  const split = useCallback(() => {
-    const currentBet = gameState?.bet || 0;
+  const split = useCallback(async () => {
+    // Fix 1.2 compatible: use per-hand bet
+    const currentHandBet = gameState?.handBets?.[gameState?.currentHandIndex] || gameState?.bet || 0;
 
-    if (balance < currentBet) {
+    if (balance < currentHandBet) {
       return { success: false, error: 'Insufficient funds for split' };
     }
 
-    withdraw(currentBet);
-    const state = engine.split();
+    withdraw(currentHandBet);
+    const state = await engine.split();
     setGameState(state);
 
     return { success: true, state };
   }, [engine, balance, withdraw, gameState]);
-
-  const handleGameEnd = useCallback((state) => {
-    if (state.result && state.result.payout > 0) {
-      deposit(state.result.payout);
-    }
-
-    endGame({
-      type: 'blackjack',
-      result: state.result.outcome,
-      bet: state.bet,
-      payout: state.result.payout,
-      netWin: state.result.payout - state.bet
-    });
-  }, [deposit, endGame]);
 
   return {
     gameState,
