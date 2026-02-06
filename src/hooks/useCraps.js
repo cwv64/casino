@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { CrapsEngine } from '../lib/craps';
 import { useWalletStore } from '../stores/walletStore';
 import { useGameStore } from '../stores/gameStore';
@@ -75,7 +75,8 @@ export const useCraps = () => {
     return oldBets;
   }, [engine]);
 
-  const getTotalBets = useCallback(() => {
+  // Fix 4.4: useMemo so getTotalBets is a derived value, not a function called on every render
+  const totalBets = useMemo(() => {
     const bets = gameState?.bets || {};
     let total = 0;
 
@@ -169,7 +170,7 @@ export const useCraps = () => {
     removeBet,
     roll,
     resetBets,
-    getTotalBets,
+    totalBets,
     repeatLastBets,
     saveBetsForRepeat,
     balance
