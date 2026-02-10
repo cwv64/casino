@@ -41,33 +41,31 @@ export const DealerChat = ({ game, event, visible = true }) => {
   useEffect(() => {
     if (!event || !visible) return;
 
-    // Prevent duplicate triggers for same event instance
-    const eventKey = `${event}-${Date.now()}`;
     if (lastEventRef.current === event) return;
     lastEventRef.current = event;
 
     const messages = DEALER_MESSAGES[game]?.[event];
     if (!messages) return;
 
-    // Clear previous timer
+    // Clear previous timers
     if (timerRef.current) clearTimeout(timerRef.current);
 
     // Small delay for natural feel
-    setTimeout(() => {
+    const delayTimer = setTimeout(() => {
       setMessage(pickRandom(messages));
       setShow(true);
 
       // Auto-hide after 3 seconds
       timerRef.current = setTimeout(() => {
         setShow(false);
-        // Reset for next event after fade out
-        setTimeout(() => {
+        timerRef.current = setTimeout(() => {
           lastEventRef.current = null;
         }, 300);
       }, 3000);
     }, 200);
 
     return () => {
+      clearTimeout(delayTimer);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [event, game, visible]);

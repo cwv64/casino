@@ -36,7 +36,6 @@ const BetArea = ({ label, betType, amount, onClick, onRemove, disabled, classNam
         className={`
           relative border-2 rounded-xl flex items-center justify-center
           font-bold transition-all duration-300 w-full h-full
-          backdrop-blur-sm
           ${!isDisabled ? 'cursor-pointer hover:border-casino-gold hover:shadow-glow-gold' : 'opacity-50 cursor-not-allowed'}
           ${hasBet ? 'border-casino-gold bg-casino-gold/20 shadow-lg' : 'border-white/40 bg-black/20'}
           ${isWinner ? 'border-green-400 bg-green-500/30 shadow-glow-green animate-pulse' : ''}
@@ -100,7 +99,7 @@ const NumberBox = ({ number, displayText, gameState, handlePlaceBet, handleRemov
       </div>
 
       {/* Main number box */}
-      <div className={`relative border-2 sm:border-4 ${isPoint ? 'border-casino-gold shadow-glow-gold-lg animate-pulse-glow' : 'border-casino-gold/60'} bg-gradient-to-br from-casino-green-dark to-black/60 backdrop-blur-sm p-1 sm:p-4 rounded-lg sm:rounded-xl min-h-[55px] sm:min-h-[120px] flex flex-col items-center justify-center overflow-hidden`}>
+      <div className={`relative border-2 sm:border-4 ${isPoint ? 'border-casino-gold shadow-glow-gold-lg animate-pulse-glow' : 'border-casino-gold/60'} bg-gradient-to-br from-casino-green-dark to-black/60 p-1 sm:p-4 rounded-lg sm:rounded-xl min-h-[55px] sm:min-h-[120px] flex flex-col items-center justify-center overflow-hidden`}>
         {showPuck && (
           <motion.div
             initial={{ y: -50, opacity: 0 }}
@@ -352,7 +351,7 @@ export const CrapsTable = () => {
 
       {/* Phase and Point Display */}
       <div className="flex gap-2 sm:gap-8 items-center flex-wrap justify-center relative z-10">
-        <div className="bg-black/40 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl border-2 border-casino-gold shadow-glow-gold">
+        <div className="bg-black/50 px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl border-2 border-casino-gold shadow-glow-gold">
           <div className="text-casino-gold text-xs sm:text-sm font-semibold">Phase</div>
           <div className="text-white text-base sm:text-xl font-bold capitalize">
             {gameState?.phase === 'comeOut' ? 'Come Out' : 'Point'}
@@ -370,7 +369,7 @@ export const CrapsTable = () => {
           </motion.div>
         )}
 
-        <div className="bg-black/40 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl border-2 border-casino-gold shadow-glow-gold">
+        <div className="bg-black/50 px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl border-2 border-casino-gold shadow-glow-gold">
           <div className="text-casino-gold text-xs sm:text-sm font-semibold">Total Bets</div>
           <div className="text-white text-base sm:text-xl font-bold">${totalBets}</div>
         </div>
@@ -429,7 +428,7 @@ export const CrapsTable = () => {
       </div>
 
       {/* Dice Display */}
-      <div className="relative z-10 bg-black/50 backdrop-blur-lg p-3 sm:p-8 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-casino-gold shadow-glow-gold-lg min-h-[80px] sm:min-h-[150px] flex items-center justify-center w-full max-w-md">
+      <div className="relative z-10 bg-black/60 p-3 sm:p-8 rounded-xl sm:rounded-2xl border-2 sm:border-4 border-casino-gold shadow-glow-gold-lg min-h-[80px] sm:min-h-[150px] flex items-center justify-center w-full max-w-md">
         {rollResult ? (
           <DicePair
             die1={rollResult.roll.die1}

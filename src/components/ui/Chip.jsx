@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 
-export const Chip = ({ value, onClick, selected = false, className = '' }) => {
+export const Chip = memo(({ value, onClick, selected = false, className = '' }) => {
   const getChipColor = (val) => {
     if (val >= 1000) return 'bg-purple-600 border-purple-400';
     if (val >= 500) return 'bg-orange-600 border-orange-400';
@@ -13,7 +14,7 @@ export const Chip = ({ value, onClick, selected = false, className = '' }) => {
 
   return (
     <motion.button
-      whileHover={{ scale: 1.1, rotate: 5 }}
+      whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}
       onClick={onClick}
       className={`
@@ -31,7 +32,7 @@ export const Chip = ({ value, onClick, selected = false, className = '' }) => {
       <span className="relative z-10 text-[0.6rem] sm:text-sm">${value}</span>
     </motion.button>
   );
-};
+});
 
 export const ChipSelector = ({ onSelectChip, selectedChip }) => {
   const chipValues = [5, 10, 25, 100, 500, 1000];
