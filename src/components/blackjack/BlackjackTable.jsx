@@ -51,6 +51,7 @@ export const BlackjackTable = () => {
   const [doubleDownFaceDown, setDoubleDownFaceDown] = useState(true);
   const [betError, setBetError] = useState(null);
   const [showHandValues, setShowHandValues] = useState(false);
+  const [showResult, setShowResult] = useState(false);
   const [dealerEvent, setDealerEvent] = useState(null);
   const { gameState, isInitialized, startHand, hit, stand, doubleDown, split } = useBlackjack();
   const { balance } = useWalletStore();
@@ -101,7 +102,17 @@ export const BlackjackTable = () => {
   useEffect(() => {
     if (gameState?.gameState === 'finished') {
       setShowDealerHole(false);
+      setShowResult(false);
       setShowHandValues(true);
+
+      // Calculate how long dealer card animations take from mount
+      const dealerCards = gameState.dealerHand?.length || 2;
+      // Each card animates in at: dealDelay(0.5) + index * 0.3, duration 0.5s
+      // Last card finishes at: 0.5 + (dealerCards - 1) * 0.3 + 0.5
+      const lastCardAnimEnd = 0.5 + (dealerCards - 1) * 0.3 + 0.5;
+      // Hole card reveal happens at 1500ms; ensure all card slide-ins are done first
+      const revealDelay = Math.max(1.5, lastCardAnimEnd + 0.2) * 1000;
+
       const timer = setTimeout(() => {
         setShowDealerHole(true);
         if (gameState.result) {
@@ -125,10 +136,13 @@ export const BlackjackTable = () => {
             sounds.lose();
           }
         }
-      }, 1500);
+        // Show result after hole card flip (0.6s) completes plus a small buffer
+        setTimeout(() => setShowResult(true), 700);
+      }, revealDelay);
       return () => clearTimeout(timer);
     } else {
       setShowDealerHole(false);
+      setShowResult(false);
     }
   }, [gameState?.gameState]);
 
@@ -242,7 +256,7 @@ export const BlackjackTable = () => {
   return (
     <div className="relative flex flex-col items-center gap-4 sm:gap-8 p-4 sm:p-8 bg-radial-gradient from-casino-green via-casino-green-dark to-black bg-felt-texture min-h-[500px] sm:min-h-[600px] rounded-2xl shadow-felt-depth vignette">
       <WinCelebration
-        show={gameState?.result && showDealerHole && (gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack')}
+        show={gameState?.result && showResult && (gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack')}
         payout={gameState?.result?.payout || 0}
       />
 
@@ -274,11 +288,11 @@ export const BlackjackTable = () => {
       </div>
 
       {/* Result Display */}
-      {gameState?.result && showDealerHole && (
+      {gameState?.result && showResult && (
         <motion.div
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.2 }}
           className={`
             relative z-10 px-4 sm:px-8 py-3 sm:py-4 rounded-xl border-4 backdrop-blur-lg
             ${gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack'
@@ -308,7 +322,7 @@ export const BlackjackTable = () => {
       <div className="flex gap-4 sm:gap-8 flex-wrap justify-center relative z-10">
         {gameState?.playerHands?.map((hand, index) => {
           const handVal = getHandValue(hand, true);
-          const status = showDealerHole ? handStatuses[index] : null;
+          const status = showResult ? handStatuses[index] : null;
 
           return (
             <div
