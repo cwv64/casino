@@ -19,27 +19,26 @@ export const Die = ({ value, isRolling = false, settleDelay = 0 }) => {
       animate={
         isRolling
           ? {
-              rotateX: [0, 360, 720, 1080],
-              rotateY: [0, 180, 540, 720],
-              rotateZ: [0, 90, 270, 360],
-              scale: [1, 0.85, 1.1, 0.95, 1],
-              y: [0, -15, 5, -5, 0],
+              rotateX: [0, 360, 720],
+              rotateY: [0, 180, 540],
+              scale: [1, 0.9, 1],
+              y: [0, -10, 0],
             }
           : {}
       }
       transition={
         isRolling
           ? {
-              duration: 1.1,
+              duration: 1.0,
               ease: [0.25, 0.1, 0.25, 1],
-              times: [0, 0.3, 0.6, 1],
-              scale: { duration: 1.1, times: [0, 0.25, 0.5, 0.75, 1] },
-              y: { duration: 1.1, times: [0, 0.25, 0.5, 0.75, 1] },
+              times: [0, 0.5, 1],
+              scale: { duration: 1.0, times: [0, 0.5, 1] },
+              y: { duration: 1.0, times: [0, 0.4, 1] },
             }
           : {}
       }
       className="relative w-14 h-14 sm:w-16 sm:h-16"
-      style={{ transformStyle: 'preserve-3d' }}
+      style={{ transformStyle: 'preserve-3d', willChange: isRolling ? 'transform' : 'auto' }}
     >
       {/* Die body with glossy effect */}
       <div

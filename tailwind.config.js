@@ -32,7 +32,7 @@ export default {
         'felt-depth': '0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
       },
       backgroundImage: {
-        'felt-texture': "url('data:image/svg+xml,%3Csvg width=\"400\" height=\"400\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cfilter id=\"noise\"%3E%3CfeTurbulence type=\"fractalNoise\" baseFrequency=\"0.9\" numOctaves=\"4\" /%3E%3C/filter%3E%3Crect width=\"400\" height=\"400\" filter=\"url(%23noise)\" opacity=\"0.05\"/%3E%3C/svg%3E')",
+        'felt-texture': "url('data:image/svg+xml,%3Csvg width=\"4\" height=\"4\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Crect width=\"1\" height=\"1\" fill=\"rgba(255,255,255,0.02)\" x=\"0\" y=\"0\"/%3E%3Crect width=\"1\" height=\"1\" fill=\"rgba(0,0,0,0.02)\" x=\"2\" y=\"2\"/%3E%3C/svg%3E')",
         'radial-gradient': 'radial-gradient(ellipse at center, var(--tw-gradient-stops))',
       },
       backdropBlur: {
@@ -44,12 +44,8 @@ export default {
       },
       keyframes: {
         'pulse-glow': {
-          '0%, 100%': {
-            boxShadow: '0 0 20px rgba(251, 191, 36, 0.4), 0 0 40px rgba(251, 191, 36, 0.2)',
-          },
-          '50%': {
-            boxShadow: '0 0 30px rgba(251, 191, 36, 0.8), 0 0 60px rgba(251, 191, 36, 0.4)',
-          },
+          '0%, 100%': { opacity: '0.7' },
+          '50%': { opacity: '1' },
         },
         'shimmer': {
           '0%': { backgroundPosition: '-1000px 0' },

@@ -136,10 +136,10 @@ export const BlackjackTable = () => {
             sounds.lose();
           }
         }
-        // Show result after hole card flip (0.6s) completes plus a small buffer
-        setTimeout(() => setShowResult(true), 700);
       }, revealDelay);
-      return () => clearTimeout(timer);
+      // Show result after hole card flip (0.6s) completes plus a small buffer
+      const resultTimer = setTimeout(() => setShowResult(true), revealDelay + 700);
+      return () => { clearTimeout(timer); clearTimeout(resultTimer); };
     } else {
       setShowDealerHole(false);
       setShowResult(false);
@@ -294,12 +294,12 @@ export const BlackjackTable = () => {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.2 }}
           className={`
-            relative z-10 px-4 sm:px-8 py-3 sm:py-4 rounded-xl border-4 backdrop-blur-lg
+            relative z-10 px-4 sm:px-8 py-3 sm:py-4 rounded-xl border-4
             ${gameState.result.outcome === 'win' || gameState.result.outcome === 'blackjack'
-              ? 'bg-gradient-to-br from-green-600/80 to-green-800/80 border-green-400 shadow-glow-green'
+              ? 'bg-gradient-to-br from-green-600 to-green-800 border-green-400 shadow-glow-green'
               : gameState.result.outcome === 'push'
-              ? 'bg-black/60 border-casino-gold shadow-glow-gold'
-              : 'bg-gradient-to-br from-red-600/80 to-red-800/80 border-red-400 shadow-glow-red'}
+              ? 'bg-black/80 border-casino-gold shadow-glow-gold'
+              : 'bg-gradient-to-br from-red-600 to-red-800 border-red-400 shadow-glow-red'}
           `}
         >
           <div className="text-center">

@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 
-export const Button = ({
+export const Button = memo(({
   children,
   onClick,
   variant = 'primary',
@@ -41,7 +42,7 @@ export const Button = ({
       disabled:border-gray-700
     `,
     ghost: `
-      bg-transparent backdrop-blur-sm
+      bg-black/30
       border-2 border-casino-gold
       text-casino-gold font-semibold
       hover:bg-casino-gold/10 hover:shadow-glow-gold
@@ -52,30 +53,20 @@ export const Button = ({
 
   return (
     <motion.button
-      whileHover={!disabled ? { scale: 1.05, y: -2 } : {}}
-      whileTap={!disabled ? { scale: 0.98, y: 1 } : {}}
+      whileHover={!disabled ? { scale: 1.05 } : {}}
+      whileTap={!disabled ? { scale: 0.98 } : {}}
       onClick={onClick}
       disabled={disabled}
       className={`
         px-6 py-3 rounded-xl
-        transition-all duration-200
+        transition-colors duration-200
         disabled:cursor-not-allowed disabled:opacity-50
-        relative overflow-hidden
         ${variants[variant]}
         ${className}
       `}
       {...props}
     >
-      <span className="relative z-10">{children}</span>
-      {/* Shine effect */}
-      {!disabled && (
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-          initial={{ x: '-100%' }}
-          whileHover={{ x: '100%' }}
-          transition={{ duration: 0.6 }}
-        />
-      )}
+      {children}
     </motion.button>
   );
-};
+});

@@ -1,8 +1,9 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 
 // 3.4: True 3D card flip using CSS backface-visibility
 // 3.8: Depth shadows that increase with overlap
-export const Card = ({ rank, suit, faceDown = false, index = 0, dealDelay = 0 }) => {
+export const Card = memo(({ rank, suit, faceDown = false, index = 0, dealDelay = 0 }) => {
   const getSuitSymbol = (s) => {
     const symbols = {
       hearts: '♥',
@@ -73,7 +74,7 @@ export const Card = ({ rank, suit, faceDown = false, index = 0, dealDelay = 0 })
       </motion.div>
     </motion.div>
   );
-};
+});
 
 export const Hand = ({ cards, faceDownFirst = false, label = '', dealDelay = 0 }) => {
   return (

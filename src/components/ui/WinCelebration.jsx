@@ -1,30 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Confetti from 'react-confetti';
-import { useWindowSize } from 'react-use';
 
 // Fix 5.8: Scale celebration intensity with payout amount
-export const WinCelebration = ({ show, payout = 0, duration = 3000 }) => {
-  const { width, height } = useWindowSize();
+export const WinCelebration = ({ show, payout = 0 }) => {
   const [isActive, setIsActive] = useState(false);
+  const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
 
-  // Scale confetti based on payout: small win = few pieces, big win = lots
-  const getIntensity = () => {
-    if (payout >= 500) return { pieces: 500, gravity: 0.2, dur: 5000 };
-    if (payout >= 200) return { pieces: 350, gravity: 0.25, dur: 4000 };
-    if (payout >= 100) return { pieces: 250, gravity: 0.3, dur: 3500 };
-    if (payout >= 50) return { pieces: 150, gravity: 0.3, dur: 3000 };
-    return { pieces: 60, gravity: 0.4, dur: 2000 };
-  };
+  // Memoize intensity to prevent unnecessary effect re-fires
+  const intensity = useMemo(() => {
+    if (payout >= 500) return { pieces: 200, gravity: 0.25, dur: 4000 };
+    if (payout >= 200) return { pieces: 150, gravity: 0.3, dur: 3500 };
+    if (payout >= 100) return { pieces: 100, gravity: 0.35, dur: 3000 };
+    if (payout >= 50) return { pieces: 60, gravity: 0.35, dur: 2500 };
+    return { pieces: 30, gravity: 0.4, dur: 2000 };
+  }, [payout]);
 
-  const intensity = getIntensity();
+  // Debounced window resize listener instead of react-use useWindowSize
+  useEffect(() => {
+    let timeout;
+    const handleResize = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        setDimensions({ width: window.innerWidth, height: window.innerHeight });
+      }, 200);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => { window.removeEventListener('resize', handleResize); clearTimeout(timeout); };
+  }, []);
 
   useEffect(() => {
     if (show) {
       setIsActive(true);
       if (navigator.vibrate) {
         if (payout >= 200) {
-          navigator.vibrate([100, 50, 100, 50, 200, 50, 100]);
-        } else if (payout >= 50) {
           navigator.vibrate([100, 50, 100, 50, 200]);
         } else {
           navigator.vibrate([50, 30, 50]);
@@ -43,8 +51,8 @@ export const WinCelebration = ({ show, payout = 0, duration = 3000 }) => {
 
   return (
     <Confetti
-      width={width}
-      height={height}
+      width={dimensions.width}
+      height={dimensions.height}
       recycle={false}
       numberOfPieces={intensity.pieces}
       gravity={intensity.gravity}
